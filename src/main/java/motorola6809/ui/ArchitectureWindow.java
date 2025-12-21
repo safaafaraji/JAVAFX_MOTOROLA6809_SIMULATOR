@@ -1,4 +1,3 @@
-// ArchitectureWindow.java - Version nettoyée et professionnelle
 package motorola6809.ui;
 
 import javafx.scene.Scene;
