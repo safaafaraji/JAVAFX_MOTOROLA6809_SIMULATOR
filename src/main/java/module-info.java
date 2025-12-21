@@ -1,0 +1,20 @@
+module motorola6809.simulator {
+    requires javafx.controls;
+    requires javafx.fxml;
+    requires transitive javafx.graphics;
+	requires javafx.base;  // ← FIX pour Stage accessible
+    
+    exports motorola6809.ui;
+    exports motorola6809.core;
+    exports motorola6809.addressing;
+    exports motorola6809.addressing.modes;
+    exports motorola6809.config;
+    exports motorola6809.utils;
+    exports motorola6809.debugger;
+    exports motorola6809.io;
+    exports motorola6809.instruction;
+    exports motorola6809.instruction.impl;
+    exports motorola6809.assembler;
+    
+    opens motorola6809.ui to javafx.fxml;
+}
