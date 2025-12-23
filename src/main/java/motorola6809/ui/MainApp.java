@@ -7,13 +7,9 @@ public class MainApp extends Application {
     
     @Override
     public void start(Stage primaryStage) {
-        // Créer et afficher le menu principal
+        // Créer et afficher la fenêtre principale
         MenuWindow menuWindow = new MenuWindow();
         menuWindow.show();
-        
-        // Créer et afficher l'architecture interne
-        ArchitectureWindow archWindow = new ArchitectureWindow();
-        archWindow.show();
     }
     
     public static void main(String[] args) {

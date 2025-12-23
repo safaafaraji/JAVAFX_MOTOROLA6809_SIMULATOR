@@ -5,7 +5,9 @@ import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.stage.Stage;
 import javafx.geometry.Insets;
-import motorola6809.integration.SimulatorBridge;
+import motorola6809.core.SimulatorBackend;
+import motorola6809.assembler.Assembler;
+import javafx.scene.text.Font;
 
 public class EditeurWindow {
     
@@ -14,127 +16,147 @@ public class EditeurWindow {
     private Button execBtn;
     private Button pasAPasBtn;
     private Button newBtn;
-    private SimulatorBridge bridge;
+    private Button assembleBtn;
+    private SimulatorBackend backend;
     
     public EditeurWindow() {
         stage = new Stage();
-        stage.setTitle("EDITEUR");
-        stage.setResizable(false);
-        stage.setAlwaysOnTop(true);
+        stage.setTitle("Éditeur Assembleur 6809");
+        stage.setResizable(true);
         
-        VBox root = new VBox(5);
-        root.setPadding(new Insets(5));
-        root.setPrefSize(250, 300);
+        VBox root = new VBox(10);
+        root.setPadding(new Insets(15));
+        root.setPrefSize(600, 500);
         
-        HBox buttonBox1 = new HBox(5);
-        newBtn = new Button("New");
-        newBtn.setPrefWidth(240);
-        newBtn.setOnAction(e -> clearAll());
-        buttonBox1.getChildren().add(newBtn);
+        // Titre
+        Label title = new Label("Éditeur de Code Assembleur Motorola 6809");
+        title.setFont(Font.font("Arial", 16));
         
-        HBox buttonBox2 = new HBox(5);
-        pasAPasBtn = new Button("Pas à Pas");
-        pasAPasBtn.setPrefWidth(115);
-        pasAPasBtn.setOnAction(e -> executeStepByStep());
+        // Barre d'outils
+        HBox toolbar = new HBox(10);
         
-        execBtn = new Button("Exécuter");
-        execBtn.setPrefWidth(115);
-        execBtn.setOnAction(e -> executeProgram());
+        newBtn = createToolbarButton("Nouveau", "#3498db");
+        newBtn.setOnAction(e -> newFile());
         
-        buttonBox2.getChildren().addAll(pasAPasBtn, execBtn);
+        assembleBtn = createToolbarButton("Assembler", "#2ecc71");
+        assembleBtn.setOnAction(e -> assembleCode());
         
+        pasAPasBtn = createToolbarButton("Pas à pas", "#f39c12");
+        pasAPasBtn.setOnAction(e -> stepExecution());
+        
+        execBtn = createToolbarButton("Exécuter", "#e74c3c");
+        execBtn.setOnAction(e -> toggleExecution());
+        
+        Button resetBtn = createToolbarButton("Reset", "#9b59b6");
+        resetBtn.setOnAction(e -> resetSimulator());
+        
+        toolbar.getChildren().addAll(newBtn, assembleBtn, pasAPasBtn, execBtn, resetBtn);
+        
+        // Zone de code
         textArea = new TextArea();
-        textArea.setFont(javafx.scene.text.Font.font("Monospaced", 12));
-        textArea.setPrefHeight(230);
+        textArea.setFont(Font.font("Monospaced", 13));
+        textArea.setPrefHeight(400);
         
-        // Exemple de code par défaut
-        textArea.setText("; Programme exemple\nORG $1400\n\nSTART:\n    LDA #$05\n    LDB #$03\n    MUL\n    NOP\nEND");
+        // Exemple minimal
+        textArea.setText(
+            "; =======================================\n" +
+            "; Programme Motorola 6809\n" +
+            "; =======================================\n" +
+            "\n" +
+            "        ORG $1000           ; Adresse de départ\n" +
+            "\n" +
+            "START   LDA #$05           ; Charger 5 dans A\n" +
+            "        LDB #$03           ; Charger 3 dans B\n" +
+            "        MUL                ; Multiplier A * B -> D\n" +
+            "        STA $2000          ; Stocker résultat\n" +
+            "        SWI                ; Retour au système\n" +
+            "\n" +
+            "        END                ; Fin du programme\n"
+        );
         
-        root.getChildren().addAll(buttonBox1, buttonBox2, textArea);
+        // Status bar
+        HBox statusBar = new HBox();
+        Label statusLabel = new Label("Prêt");
+        statusLabel.setFont(Font.font("Arial", 11));
+        statusBar.getChildren().add(statusLabel);
         
-        Scene scene = new Scene(root, 250, 300);
+        root.getChildren().addAll(title, toolbar, textArea, statusBar);
+        
+        Scene scene = new Scene(root, 600, 500);
         stage.setScene(scene);
-        stage.setX(1000);
-        stage.setY(120);
         
-        // Initialisation du bridge
-        this.bridge = new SimulatorBridge(this);
+        // Initialisation du backend
+        this.backend = SimulatorBackend.getInstance();
+        
+        // Positionnement
+        stage.setX(100);
+        stage.setY(100);
     }
     
-    private void clearAll() {
+    private Button createToolbarButton(String text, String color) {
+        Button btn = new Button(text);
+        btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
+                    "-fx-background-radius: 4; -fx-padding: 8 15 8 15;");
+        btn.setFont(Font.font("Arial", 12));
+        return btn;
+    }
+    
+    private void newFile() {
         textArea.clear();
-        execBtn.setText("Exécuter");
-        execBtn.setDisable(false);
-        pasAPasBtn.setDisable(false);
-        ArchitectureWindow.resetValues();
-        ProgrammeWindow.clear();
-        bridge.reset();
+        showAlert("Nouveau fichier", "Prêt pour un nouveau programme.");
     }
     
-    private void executeStepByStep() {
-        try {
-            // Compile si nécessaire
-            if (!bridge.isProgramLoaded()) {
-                String code = textArea.getText();
-                if (code.trim().isEmpty()) {
-                    showAlert("Erreur", "Le code est vide !");
-                    return;
-                }
-                
-                System.out.println("=== COMPILATION ===");
-                System.out.println(code);
-                
-                boolean success = bridge.compileAndLoad();
-                if (!success) {
-                    showAlert("Erreur de compilation", "Vérifiez votre code assembleur");
-                    return;
-                }
-            }
-            
-            // Exécute une instruction
-            System.out.println("=== EXECUTION PAS A PAS ===");
-            boolean executed = bridge.executeStep();
-            
-            if (!executed) {
-                showAlert("Fin du programme", "Le programme est terminé (SWI)");
-            }
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            showAlert("Erreur", e.getMessage());
+    private void assembleCode() {
+        String code = textArea.getText();
+        
+        if (code.trim().isEmpty()) {
+            showAlert("Erreur", "Le code source est vide.");
+            return;
         }
-    }
-    
-    private void executeProgram() {
+        
         try {
-            // Si pas encore chargé, compile
-            if (!bridge.isProgramLoaded()) {
-                String code = textArea.getText();
-                if (code.trim().isEmpty()) {
-                    showAlert("Erreur", "Le code est vide !");
-                    return;
-                }
-                
-                boolean success = bridge.compileAndLoad();
-                if (!success) {
-                    showAlert("Erreur de compilation", "Vérifiez votre code assembleur");
-                    return;
-                }
-            }
-            
-            // Basculer entre exécution et arrêt
-            if (bridge.isRunning()) {
-                bridge.stop();
-                execBtn.setText("Exécuter");
+            boolean success = backend.assemble(code);
+            if (success) {
+                showAlert("Succès", "Programme assemblé avec succès.\n" +
+                                  "Taille: " + backend.getCurrentProgram().length + " octets");
             } else {
-                bridge.executeAll();
-                execBtn.setText("Arrêter");
+                showAlert("Erreur", "Échec de l'assemblage.");
             }
-            
         } catch (Exception e) {
-            e.printStackTrace();
-            showAlert("Erreur", e.getMessage());
+            showAlert("Erreur", "Exception: " + e.getMessage());
         }
+    }
+    
+    private void stepExecution() {
+        if (backend.getCurrentProgram() == null) {
+            showAlert("Erreur", "Aucun programme assemblé. Utilisez 'Assembler' d'abord.");
+            return;
+        }
+        
+        backend.step();
+        showAlert("Pas à pas", "Instruction exécutée.\nPC: $" + 
+                  SimulatorBackend.formatHex16(backend.getPC()));
+    }
+    
+    private void toggleExecution() {
+        if (backend.getCurrentProgram() == null) {
+            showAlert("Erreur", "Aucun programme assemblé.");
+            return;
+        }
+        
+        if (backend.isRunning()) {
+            backend.stop();
+            execBtn.setText("Exécuter");
+        } else {
+            backend.start();
+            execBtn.setText("Arrêter");
+        }
+    }
+    
+    private void resetSimulator() {
+        backend.reset();
+        execBtn.setText("Exécuter");
+        showAlert("Reset", "Simulateur réinitialisé.");
     }
     
     private void showAlert(String title, String message) {

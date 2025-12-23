@@ -14,6 +14,7 @@ module motorola6809.simulator {
     exports motorola6809.instruction;
     exports motorola6809.instruction.impl;
     exports motorola6809.assembler;
+    exports motorola6809.test to javafx.graphics;
     
     opens motorola6809.ui to javafx.fxml;
 }
