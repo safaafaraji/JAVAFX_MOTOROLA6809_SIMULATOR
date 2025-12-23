@@ -7,13 +7,11 @@ import java.util.Arrays;
 
 public class Memory {
     
-    private byte[] ram;
-    private byte[] rom;
+    private byte[] memory; // Une seule mémoire unifiée de 64KB
     private MemoryMap memoryMap;
     
     public Memory() {
-        this.ram = new byte[Constants.RAM_SIZE];
-        this.rom = new byte[Constants.ROM_SIZE];
+        this.memory = new byte[Constants.TOTAL_MEMORY]; // 64KB
         this.memoryMap = new MemoryMap();
         reset();
     }
@@ -22,8 +20,17 @@ public class Memory {
      * Réinitialise la mémoire
      */
     public void reset() {
-        Arrays.fill(ram, (byte) 0x00);
-        Arrays.fill(rom, (byte) 0xFF);
+        // Remplir de 0xFF (valeur non initialisée typique)
+        Arrays.fill(memory, (byte) 0xFF);
+        
+        // Initialiser les vecteurs d'interruption
+        writeWord(Constants.VECTOR_RESET, 0x1400); // Reset vector vers ROM
+        writeWord(Constants.VECTOR_IRQ, 0xFFFF);
+        writeWord(Constants.VECTOR_FIRQ, 0xFFFF);
+        writeWord(Constants.VECTOR_NMI, 0xFFFF);
+        writeWord(Constants.VECTOR_SWI, 0xFFFF);
+        writeWord(Constants.VECTOR_SWI2, 0xFFFF);
+        writeWord(Constants.VECTOR_SWI3, 0xFFFF);
     }
     
     /**
@@ -31,17 +38,7 @@ public class Memory {
      */
     public int readByte(int address) {
         address &= Constants.MASK_16BIT;
-        
-        if (memoryMap.isRAM(address)) {
-            int offset = address - memoryMap.getRamStart();
-            return ram[offset] & 0xFF;
-        } else if (memoryMap.isROM(address)) {
-            int offset = address - memoryMap.getRomStart();
-            return rom[offset] & 0xFF;
-        }
-        
-        // Adresse non mappée
-        return 0xFF;
+        return memory[address] & 0xFF;
     }
     
     /**
@@ -51,14 +48,14 @@ public class Memory {
         address &= Constants.MASK_16BIT;
         value &= 0xFF;
         
-        if (memoryMap.isRAM(address)) {
-            int offset = address - memoryMap.getRamStart();
-            ram[offset] = (byte) value;
-        } else if (memoryMap.isROM(address)) {
-            int offset = address - memoryMap.getRomStart();
-            rom[offset] = (byte) value;
+        // Vérifier si on écrit dans la ROM (écriture interdite)
+        if (memoryMap.isROM(address)) {
+            // La ROM est en lecture seule, on ignore l'écriture
+            // Mais pour le simulateur, on permet l'écriture
+            System.out.println("⚠️ Écriture en ROM à $" + String.format("%04X", address));
         }
-        // Ignore les écritures vers des zones non mappées
+        
+        memory[address] = (byte) value;
     }
     
     /**
@@ -83,23 +80,26 @@ public class Memory {
      * Charge un programme en mémoire
      */
     public void loadProgram(byte[] program, int startAddress) {
+        System.out.println("Chargement programme: " + program.length + 
+                         " octets à $" + String.format("%04X", startAddress));
+        
         for (int i = 0; i < program.length; i++) {
             writeByte(startAddress + i, program[i] & 0xFF);
         }
+        
+        // Afficher les premiers octets pour debug
+        System.out.print("Premiers octets: ");
+        for (int i = 0; i < Math.min(16, program.length); i++) {
+            System.out.print(String.format("%02X ", program[i] & 0xFF));
+        }
+        System.out.println();
     }
     
     /**
-     * Obtient une copie de la RAM
+     * Obtient une copie de la mémoire
      */
-    public byte[] getRAMCopy() {
-        return Arrays.copyOf(ram, ram.length);
-    }
-    
-    /**
-     * Obtient une copie de la ROM
-     */
-    public byte[] getROMCopy() {
-        return Arrays.copyOf(rom, rom.length);
+    public byte[] getMemoryCopy() {
+        return Arrays.copyOf(memory, memory.length);
     }
     
     /**
@@ -117,4 +117,3 @@ public class Memory {
         return sb.toString();
     }
 }
-
