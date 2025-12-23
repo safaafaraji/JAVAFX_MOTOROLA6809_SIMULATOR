@@ -13,17 +13,19 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-public class MenuWindow extends Stage {
+public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObserver {
     
     private SimulatorBackend backend;
     private EditeurWindow editeurWindow;
     private ArchitectureWindow architectureWindow;
     
+    // Composants UI
     private Label statusLabel;
     private Label pcLabel;
     private Label aLabel;
     private Label bLabel;
     private TextArea logArea;
+    private TextArea editorArea;
     private ScheduledExecutorService refreshExecutor;
     
     public MenuWindow() {
@@ -32,8 +34,16 @@ public class MenuWindow extends Stage {
         
         // Initialiser le backend
         backend = SimulatorBackend.getInstance();
+        backend.addObserver(this); // S'enregistrer comme observateur
         
         // Créer l'interface
+        createUI();
+        
+        // Démarrer les mises à jour
+        startRefreshTimer();
+    }
+    
+    private void createUI() {
         BorderPane root = new BorderPane();
         root.setStyle("-fx-background-color: #2c3e50;");
         
@@ -48,9 +58,6 @@ public class MenuWindow extends Stage {
         
         Scene scene = new Scene(root, 1000, 700);
         setScene(scene);
-        
-        // Démarrer les mises à jour
-        startRefreshTimer();
     }
     
     private HBox createTopBar() {
@@ -102,7 +109,7 @@ public class MenuWindow extends Stage {
         Label editorLabel = new Label("Éditeur de Code Assembleur");
         editorLabel.setFont(Font.font("Arial", FontWeight.BOLD, 16));
         
-        TextArea editorArea = new TextArea();
+        editorArea = new TextArea();
         editorArea.setFont(Font.font("Monospaced", 13));
         editorArea.setPrefHeight(250);
         editorArea.setText(
@@ -111,7 +118,8 @@ public class MenuWindow extends Stage {
             "; Tapez votre code assembleur ici\n" +
             "; ============================================\n\n" +
             "        ORG $1000           ; Adresse de départ\n\n" +
-            "START   LDA #$05           ; Charger 5 dans A\n" +
+            " START :										\n  "  +
+            "		 LDA #$05           ; Charger 5 dans A\n" +
             "        LDB #$03           ; Charger 3 dans B\n" +
             "        MUL                ; Multiplier A * B -> D\n" +
             "        STA $2000          ; Stocker résultat\n" +
@@ -253,7 +261,7 @@ public class MenuWindow extends Stage {
                 updateStatus();
                 updateLog();
             });
-        }, 0, 100, TimeUnit.MILLISECONDS); // Mise à jour 10x par seconde
+        }, 0, 100, TimeUnit.MILLISECONDS);
     }
     
     private void updateStatus() {
@@ -350,6 +358,48 @@ public class MenuWindow extends Stage {
         memStage.show();
     }
     
+    // ==================== IMPLÉMENTATION OBSERVER ====================
+    
+    @Override
+    public void onRegisterUpdate(String register, int value) {
+        // Mettre à jour l'interface si nécessaire
+        javafx.application.Platform.runLater(() -> {
+            updateStatus(); // Rafraîchir les labels
+        });
+    }
+    
+    @Override
+    public void onFlagUpdate(String flag, boolean value) {
+        // Flags - pas d'affichage direct dans MenuWindow
+    }
+    
+    @Override
+    public void onMemoryUpdate(int address, int value) {
+        // Mémoire - pas d'affichage direct
+    }
+    
+    @Override
+    public void onExecutionStateChange(boolean running, boolean paused) {
+        javafx.application.Platform.runLater(() -> {
+            updateStatus();
+        });
+    }
+    
+    @Override
+    public void onProgramLoaded(int startAddress, int size) {
+        javafx.application.Platform.runLater(() -> {
+            logArea.appendText("✓ Programme chargé à $" + formatHex16(startAddress) + 
+                             " (" + size + " octets)\n");
+        });
+    }
+    
+    @Override
+    public void onLogMessage(String message) {
+        javafx.application.Platform.runLater(() -> {
+            // Les logs sont déjà gérés par updateLog()
+        });
+    }
+    
     @Override
     public void close() {
         if (refreshExecutor != null) {
@@ -359,7 +409,8 @@ public class MenuWindow extends Stage {
         super.close();
     }
     
-    // Classe pour les lignes de mémoire
+    // ==================== CLASSE INTERNE POUR MÉMOIRE ====================
+    
     public static class MemoryRow {
         private final javafx.beans.property.SimpleStringProperty address;
         private final javafx.beans.property.SimpleStringProperty data;

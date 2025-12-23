@@ -9,8 +9,9 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 import javafx.geometry.*;
 import motorola6809.core.SimulatorBackend;
+import javafx.application.Platform;
 
-public class ArchitectureWindow {
+public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
     
     private Stage stage;
     private SimulatorBackend backend;
@@ -36,15 +37,19 @@ public class ArchitectureWindow {
     private Label vLabel;
     private Label cLabel;
     
-    // Boutons de rafraîchissement
+    // Boutons
     private Button refreshBtn;
     private Button editBtn;
+    private Button autoRefreshBtn;
+    private boolean autoRefresh = true;
     
     public ArchitectureWindow(SimulatorBackend backend) {
         this.backend = backend;
         this.stage = new Stage();
         stage.setTitle("Architecture 6809 - Vue Dynamique");
-        stage.setResizable(false);
+        
+        // S'enregistrer comme observateur
+        backend.addObserver(this);
         
         createUI();
     }
@@ -54,10 +59,19 @@ public class ArchitectureWindow {
         root.setPadding(new Insets(20));
         root.setStyle("-fx-background-color: #f8f9fa;");
         
-        // Titre
+        // Titre avec état
+        HBox titleBox = new HBox(10);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+        
         Label title = new Label("ARCHITECTURE MOTOROLA 6809");
         title.setFont(Font.font("Arial", FontWeight.BOLD, 18));
         title.setTextFill(Color.web("#2c3e50"));
+        
+        Label statusLabel = new Label("● En attente");
+        statusLabel.setFont(Font.font("Arial", 12));
+        statusLabel.setTextFill(Color.GRAY);
+        
+        titleBox.getChildren().addAll(title, statusLabel);
         
         // Conteneur principal
         GridPane grid = new GridPane();
@@ -114,23 +128,27 @@ public class ArchitectureWindow {
         
         refreshBtn = new Button("🔄 Rafraîchir");
         refreshBtn.setStyle("-fx-background-color: #3498db; -fx-text-fill: white; -fx-padding: 8 15;");
-        refreshBtn.setOnAction(e -> refresh());
+        refreshBtn.setOnAction(e -> manualRefresh());
+        
+        autoRefreshBtn = new Button("✅ Auto-rafraîchir");
+        autoRefreshBtn.setStyle("-fx-background-color: #2ecc71; -fx-text-fill: white; -fx-padding: 8 15;");
+        autoRefreshBtn.setOnAction(e -> toggleAutoRefresh());
         
         editBtn = new Button("✏️ Éditer les registres");
-        editBtn.setStyle("-fx-background-color: #2ecc71; -fx-text-fill: white; -fx-padding: 8 15;");
+        editBtn.setStyle("-fx-background-color: #9b59b6; -fx-text-fill: white; -fx-padding: 8 15;");
         editBtn.setOnAction(e -> openRegisterEditor());
         
-        buttonBox.getChildren().addAll(refreshBtn, editBtn);
+        buttonBox.getChildren().addAll(refreshBtn, autoRefreshBtn, editBtn);
         
-        root.getChildren().addAll(title, grid, flagsSection, buttonBox);
+        root.getChildren().addAll(titleBox, grid, flagsSection, buttonBox);
         
-        Scene scene = new Scene(root, 500, 450);
+        Scene scene = new Scene(root, 550, 500);
         stage.setScene(scene);
         stage.setX(50);
         stage.setY(100);
         
-        // Initial refresh
-        refresh();
+        // Rafraîchissement initial
+        manualRefresh();
     }
     
     private Label createRegisterField(GridPane grid, int col, int row, String name, 
@@ -138,7 +156,8 @@ public class ArchitectureWindow {
                                      Font labelFont, Font valueFont) {
         VBox box = new VBox(3);
         box.setPadding(new Insets(8));
-        box.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-radius: 4;");
+        box.setStyle("-fx-background-color: #ffffff; -fx-border-color: #dee2e6; " +
+                    "-fx-border-radius: 4; -fx-border-width: 2;");
         box.setAlignment(Pos.CENTER);
         
         Label nameLabel = new Label(name);
@@ -176,7 +195,7 @@ public class ArchitectureWindow {
         valueLabel.setMinWidth(25);
         valueLabel.setAlignment(Pos.CENTER);
         valueLabel.setStyle("-fx-background-color: white; -fx-border-color: #ced4da; " +
-                           "-fx-border-radius: 3; -fx-padding: 3;");
+                           "-fx-border-radius: 3; -fx-padding: 3; -fx-border-width: 2;");
         
         Label descLabel = new Label(description);
         descLabel.setFont(Font.font("Arial", 8));
@@ -188,9 +207,137 @@ public class ArchitectureWindow {
         return valueLabel;
     }
     
-    // Méthodes publiques pour mettre à jour l'affichage
-    public void refresh() {
-        // Mettre à jour les registres depuis le backend
+    // ==================== IMPLÉMENTATION OBSERVER ====================
+    
+    @Override
+    public void onRegisterUpdate(String register, int value) {
+        if (!autoRefresh) return;
+        
+        Platform.runLater(() -> {
+            switch (register) {
+                case "PC":
+                    pcLabel.setText(formatHex16(value));
+                    highlightRegister(pcLabel);
+                    break;
+                case "A":
+                    aLabel.setText(formatHex8(value));
+                    dLabel.setText(formatHex16(backend.getD())); // Mettre à jour D aussi
+                    highlightRegister(aLabel);
+                    break;
+                case "B":
+                    bLabel.setText(formatHex8(value));
+                    dLabel.setText(formatHex16(backend.getD())); // Mettre à jour D aussi
+                    highlightRegister(bLabel);
+                    break;
+                case "X":
+                    xLabel.setText(formatHex16(value));
+                    highlightRegister(xLabel);
+                    break;
+                case "Y":
+                    yLabel.setText(formatHex16(value));
+                    highlightRegister(yLabel);
+                    break;
+                case "S":
+                    sLabel.setText(formatHex16(value));
+                    highlightRegister(sLabel);
+                    break;
+                case "U":
+                    uLabel.setText(formatHex16(value));
+                    highlightRegister(uLabel);
+                    break;
+                case "DP":
+                    dpLabel.setText(formatHex8(value));
+                    highlightRegister(dpLabel);
+                    break;
+            }
+        });
+    }
+    
+    @Override
+    public void onFlagUpdate(String flag, boolean value) {
+        if (!autoRefresh) return;
+        
+        Platform.runLater(() -> {
+            switch (flag) {
+                case "E": updateFlagDisplay(eLabel, value); break;
+                case "F": updateFlagDisplay(fLabel, value); break;
+                case "H": updateFlagDisplay(hLabel, value); break;
+                case "I": updateFlagDisplay(iLabel, value); break;
+                case "N": updateFlagDisplay(nLabel, value); break;
+                case "Z": updateFlagDisplay(zLabel, value); break;
+                case "V": updateFlagDisplay(vLabel, value); break;
+                case "C": updateFlagDisplay(cLabel, value); break;
+            }
+        });
+    }
+    
+    @Override
+    public void onMemoryUpdate(int address, int value) {
+        // Pas utilisé ici
+    }
+    
+    @Override
+    public void onExecutionStateChange(boolean running, boolean paused) {
+        Platform.runLater(() -> {
+            if (running) {
+                if (paused) {
+                    stage.setTitle("Architecture 6809 - ⏸ En pause");
+                } else {
+                    stage.setTitle("Architecture 6809 - ▶ En cours");
+                }
+            } else {
+                stage.setTitle("Architecture 6809 - ⏹ Arrêté");
+            }
+        });
+    }
+    
+    @Override
+    public void onProgramLoaded(int startAddress, int size) {
+        Platform.runLater(() -> {
+            stage.setTitle("Architecture 6809 - Programme chargé");
+            manualRefresh();
+        });
+    }
+    
+    // ==================== MÉTHODES UTILITAIRES ====================
+    
+    private void highlightRegister(Label label) {
+        label.setStyle("-fx-background-color: #e8f5e8; -fx-border-color: #4CAF50; " +
+                      "-fx-border-width: 2; -fx-border-radius: 3;");
+        
+        // Retirer le surlignage après 300ms
+        new Thread(() -> {
+            try {
+                Thread.sleep(300);
+                Platform.runLater(() -> {
+                    label.setStyle("");
+                });
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+    
+    private void updateFlagDisplay(Label flagLabel, boolean value) {
+        flagLabel.setText(value ? "1" : "0");
+        flagLabel.setTextFill(value ? Color.GREEN : Color.web("#2c3e50"));
+        
+        // Animation de changement
+        flagLabel.setStyle("-fx-border-color: #FF9800; -fx-border-width: 2;");
+        new Thread(() -> {
+            try {
+                Thread.sleep(200);
+                Platform.runLater(() -> {
+                    flagLabel.setStyle("-fx-border-color: #ced4da; -fx-border-width: 1;");
+                });
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }).start();
+    }
+    
+    private void manualRefresh() {
+        // Mettre à jour tous les registres
         pcLabel.setText(formatHex16(backend.getPC()));
         aLabel.setText(formatHex8(backend.getA()));
         bLabel.setText(formatHex8(backend.getB()));
@@ -201,7 +348,7 @@ public class ArchitectureWindow {
         dpLabel.setText(formatHex8(backend.getDP()));
         dLabel.setText(formatHex16(backend.getD()));
         
-        // Mettre à jour les flags
+        // Mettre à jour tous les flags
         updateFlagDisplay(eLabel, backend.getFlag("E"));
         updateFlagDisplay(fLabel, backend.getFlag("F"));
         updateFlagDisplay(hLabel, backend.getFlag("H"));
@@ -212,9 +359,15 @@ public class ArchitectureWindow {
         updateFlagDisplay(cLabel, backend.getFlag("C"));
     }
     
-    private void updateFlagDisplay(Label flagLabel, boolean value) {
-        flagLabel.setText(value ? "1" : "0");
-        flagLabel.setTextFill(value ? Color.GREEN : Color.web("#2c3e50"));
+    private void toggleAutoRefresh() {
+        autoRefresh = !autoRefresh;
+        if (autoRefresh) {
+            autoRefreshBtn.setText("✅ Auto-rafraîchir");
+            autoRefreshBtn.setStyle("-fx-background-color: #2ecc71; -fx-text-fill: white;");
+        } else {
+            autoRefreshBtn.setText("⭕ Auto-rafraîchir");
+            autoRefreshBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
+        }
     }
     
     private String formatHex16(int value) {
@@ -226,7 +379,7 @@ public class ArchitectureWindow {
     }
     
     private void openRegisterEditor() {
-        // Créer une fenêtre d'édition des registres
+        // Fenêtre d'édition des registres
         Stage editorStage = new Stage();
         editorStage.setTitle("Éditeur de Registres");
         
@@ -237,37 +390,53 @@ public class ArchitectureWindow {
         grid.setHgap(10);
         grid.setVgap(10);
         
-        // Champs d'édition pour chaque registre
-        TextField pcField = createEditField("PC", backend.getPC(), 16);
-        TextField aField = createEditField("A", backend.getA(), 8);
-        TextField bField = createEditField("B", backend.getB(), 8);
-        TextField xField = createEditField("X", backend.getX(), 16);
-        TextField yField = createEditField("Y", backend.getY(), 16);
-        TextField sField = createEditField("S", backend.getS(), 16);
-        TextField uField = createEditField("U", backend.getU(), 16);
-        TextField dpField = createEditField("DP", backend.getDP(), 8);
+        // Champs d'édition
+        TextField[] fields = new TextField[8];
+        String[] labels = {"PC", "A", "B", "X", "Y", "S", "U", "DP"};
+        int[] values = {
+            backend.getPC(), backend.getA(), backend.getB(),
+            backend.getX(), backend.getY(), backend.getS(),
+            backend.getU(), backend.getDP()
+        };
+        int[] bits = {16, 8, 8, 16, 16, 16, 16, 8};
         
-        grid.add(new Label("PC:"), 0, 0);
-        grid.add(pcField, 1, 0);
-        grid.add(new Label("A:"), 0, 1);
-        grid.add(aField, 1, 1);
-        grid.add(new Label("B:"), 0, 2);
-        grid.add(bField, 1, 2);
-        grid.add(new Label("X:"), 2, 0);
-        grid.add(xField, 3, 0);
-        grid.add(new Label("Y:"), 2, 1);
-        grid.add(yField, 3, 1);
-        grid.add(new Label("S:"), 2, 2);
-        grid.add(sField, 3, 2);
-        grid.add(new Label("U:"), 4, 0);
-        grid.add(uField, 5, 0);
-        grid.add(new Label("DP:"), 4, 1);
-        grid.add(dpField, 5, 1);
+        for (int i = 0; i < labels.length; i++) {
+            grid.add(new Label(labels[i] + ":"), 0, i);
+            fields[i] = new TextField();
+            fields[i].setText(bits[i] == 16 ? formatHex16(values[i]) : formatHex8(values[i]));
+            fields[i].setPrefWidth(80);
+            fields[i].setUserData(new Object[]{labels[i], bits[i]});
+            grid.add(fields[i], 1, i);
+        }
         
         Button applyBtn = new Button("Appliquer");
         applyBtn.setOnAction(e -> {
-            applyRegisterChanges(pcField, aField, bField, xField, yField, sField, uField, dpField);
-            refresh();
+            for (TextField field : fields) {
+                try {
+                    Object[] data = (Object[]) field.getUserData();
+                    String regName = (String) data[0];
+                    int bitsSize = (int) data[1];
+                    String text = field.getText().trim();
+                    
+                    if (text.isEmpty()) continue;
+                    
+                    int value = Integer.parseInt(text.replace("$", ""), 16);
+                    
+                    switch (regName) {
+                        case "PC": backend.setPC(value); break;
+                        case "A": backend.setA(value); break;
+                        case "B": backend.setB(value); break;
+                        case "X": backend.setX(value); break;
+                        case "Y": backend.setY(value); break;
+                        case "S": backend.setS(value); break;
+                        case "U": backend.setU(value); break;
+                        case "DP": backend.setDP(value); break;
+                    }
+                    
+                } catch (NumberFormatException ex) {
+                    showAlert("Erreur", "Valeur invalide: " + field.getText());
+                }
+            }
             editorStage.close();
         });
         
@@ -279,46 +448,9 @@ public class ArchitectureWindow {
         
         root.getChildren().addAll(new Label("Modifier les registres:"), grid, buttons);
         
-        Scene scene = new Scene(root, 400, 250);
+        Scene scene = new Scene(root, 250, 350);
         editorStage.setScene(scene);
         editorStage.show();
-    }
-    
-    private TextField createEditField(String regName, int value, int bits) {
-        TextField field = new TextField();
-        field.setText(bits == 16 ? formatHex16(value) : formatHex8(value));
-        field.setPrefWidth(70);
-        field.setUserData(new Object[]{regName, bits});
-        return field;
-    }
-    
-    private void applyRegisterChanges(TextField... fields) {
-        for (TextField field : fields) {
-            try {
-                Object[] data = (Object[]) field.getUserData();
-                String regName = (String) data[0];
-                int bits = (int) data[1];
-                String text = field.getText().trim();
-                
-                if (text.isEmpty()) continue;
-                
-                int value = Integer.parseInt(text.replace("$", ""), 16);
-                
-                switch (regName) {
-                    case "PC": backend.setPC(value); break;
-                    case "A": backend.setA(value); break;
-                    case "B": backend.setB(value); break;
-                    case "X": backend.setX(value); break;
-                    case "Y": backend.setY(value); break;
-                    case "S": backend.setS(value); break;
-                    case "U": backend.setU(value); break;
-                    case "DP": backend.setDP(value); break;
-                }
-                
-            } catch (NumberFormatException e) {
-                showAlert("Erreur", "Valeur invalide pour " + field.getText());
-            }
-        }
     }
     
     private void showAlert(String title, String message) {
@@ -339,5 +471,10 @@ public class ArchitectureWindow {
     
     public boolean isShowing() {
         return stage.isShowing();
+    }
+    @Override
+    public void onLogMessage(String message) {
+        // Optionnel: gérer les messages de log si nécessaire
+        // System.out.println("Log: " + message);
     }
 }

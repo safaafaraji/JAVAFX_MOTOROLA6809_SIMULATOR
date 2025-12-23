@@ -23,7 +23,8 @@ public class EditeurWindow {
         stage = new Stage();
         stage.setTitle("Éditeur Assembleur 6809");
         stage.setResizable(true);
-        
+        this.backend = SimulatorBackend.getInstance();
+
         VBox root = new VBox(10);
         root.setPadding(new Insets(15));
         root.setPrefSize(600, 500);
