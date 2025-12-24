@@ -291,10 +291,11 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
         });
     }
     
+    
     @Override
     public void onProgramLoaded(int startAddress, int size) {
         Platform.runLater(() -> {
-            stage.setTitle("Architecture 6809 - Programme chargé");
+            stage.setTitle("Architecture 6809 - Programme chargé (" + size + " octets)");
             manualRefresh();
         });
     }
@@ -472,9 +473,17 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
     public boolean isShowing() {
         return stage.isShowing();
     }
+
+  
+
     @Override
-    public void onLogMessage(String message) {
-        // Optionnel: gérer les messages de log si nécessaire
-        // System.out.println("Log: " + message);
+    public void onExecutionStep(int pc, int opcode, int cycles) {
+        Platform.runLater(() -> {
+            // Mettre à jour l'affichage de l'instruction courante 
+           stage.setTitle("Architecture 6809 - PC: $" + formatHex16(pc));
+        });
     }
+    
+   
+ 
 }

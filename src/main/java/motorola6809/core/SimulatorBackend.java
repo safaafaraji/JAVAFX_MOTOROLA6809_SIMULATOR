@@ -1,30 +1,25 @@
 package motorola6809.core;
 
 import motorola6809.assembler.Assembler;
+import motorola6809.instruction.InstructionDecoder;  
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Simulateur backend avec pattern Observer pour mises à jour en temps réel
- */
 public class SimulatorBackend {
     
-    // Singleton
     private static SimulatorBackend instance;
-    
-    // Composants
     private CPU cpu;
     private Assembler assembler;
     
-    // État
+    // État d'exécution
     private boolean isRunning = false;
     private boolean isPaused = false;
     private ScheduledExecutorService executor;
     
-    // Données
+    // Données du programme
     private byte[] currentProgram;
     private int programStartAddress = 0x1000;
     private List<String> executionLog;
@@ -33,17 +28,6 @@ public class SimulatorBackend {
     // Observateurs
     private List<SimulatorObserver> observers = new ArrayList<>();
     
-    // Interface Observer
-    public interface SimulatorObserver {
-        void onRegisterUpdate(String register, int value);
-        void onFlagUpdate(String flag, boolean value);
-        void onMemoryUpdate(int address, int value);
-        void onExecutionStateChange(boolean running, boolean paused);
-        void onProgramLoaded(int startAddress, int size);
-        void onLogMessage(String message);
-    }
-    
-    // Constructeur privé
     private SimulatorBackend() {
         this.cpu = new CPU();
         this.assembler = new Assembler();
@@ -51,7 +35,6 @@ public class SimulatorBackend {
         initialize();
     }
     
-    // Singleton
     public static synchronized SimulatorBackend getInstance() {
         if (instance == null) {
             instance = new SimulatorBackend();
@@ -59,7 +42,16 @@ public class SimulatorBackend {
         return instance;
     }
     
-    // ==================== OBSERVER MANAGEMENT ====================
+    // ==================== INTERFACE OBSERVER ====================
+    
+    public interface SimulatorObserver {
+        void onRegisterUpdate(String register, int value);
+        void onFlagUpdate(String flag, boolean value);
+        void onMemoryUpdate(int address, int value);
+        void onExecutionStateChange(boolean running, boolean paused);
+        void onProgramLoaded(int startAddress, int size);
+        void onExecutionStep(int pc, int opcode, int cycles);
+    }
     
     public void addObserver(SimulatorObserver observer) {
         observers.add(observer);
@@ -81,12 +73,6 @@ public class SimulatorBackend {
         }
     }
     
-    private void notifyMemoryUpdate(int address, int value) {
-        for (SimulatorObserver observer : observers) {
-            observer.onMemoryUpdate(address, value);
-        }
-    }
-    
     private void notifyExecutionStateChange() {
         for (SimulatorObserver observer : observers) {
             observer.onExecutionStateChange(isRunning, isPaused);
@@ -100,15 +86,15 @@ public class SimulatorBackend {
         }
     }
     
-    private void notifyLogMessage(String message) {
+    private void notifyExecutionStep(int pc, int opcode, int cycles) {
         for (SimulatorObserver observer : observers) {
-            observer.onLogMessage(message);
+            observer.onExecutionStep(pc, opcode, cycles);
         }
     }
     
     // ==================== INITIALISATION ====================
     
-    public void initialize() {
+    private void initialize() {
         cpu.reset();
         executionLog.clear();
         instructionCount = 0;
@@ -116,6 +102,8 @@ public class SimulatorBackend {
         isPaused = false;
         
         log("Simulateur initialisé");
+        notifyAllRegisters();
+        notifyAllFlags();
     }
     
     // ==================== ASSEMBLAGE ====================
@@ -123,33 +111,26 @@ public class SimulatorBackend {
     public boolean assemble(String sourceCode) {
         try {
             log("Début de l'assemblage...");
+            
             currentProgram = assembler.assemble(sourceCode);
             cpu.loadProgram(currentProgram, programStartAddress);
             
             log("Programme assemblé : " + currentProgram.length + " octets");
-            log("Adresse de départ : $" + formatHex16(programStartAddress));
+            log("Adresse de départ : $" + String.format("%04X", programStartAddress));
             
             notifyProgramLoaded();
             notifyAllRegisters();
-            notifyAllFlags();
             
             return true;
             
         } catch (Exception e) {
             log("Erreur d'assemblage : " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
     
-    public boolean assembleAndRun(String sourceCode) {
-        if (assemble(sourceCode)) {
-            start();
-            return true;
-        }
-        return false;
-    }
-    
-    // ==================== EXÉCUTION ====================
+    // ==================== CONTRÔLE D'EXÉCUTION ====================
     
     public void start() {
         if (currentProgram == null || currentProgram.length == 0) {
@@ -161,7 +142,6 @@ public class SimulatorBackend {
         
         isRunning = true;
         isPaused = false;
-        cpu.start();
         
         log("Exécution démarrée");
         notifyExecutionStateChange();
@@ -171,29 +151,19 @@ public class SimulatorBackend {
             if (!isRunning || isPaused) return;
             
             try {
-                int cycles = cpu.executeInstruction();
-                instructionCount++;
-                
-                // Notifications après instruction
-                notifyAllRegisters();
-                notifyAllFlags();
-                
-                log("Instruction exécutée : PC=$" + formatHex16(cpu.getRegisters().getPC()));
-                
+                executeStepInternal();
             } catch (Exception e) {
                 log("Erreur d'exécution : " + e.getMessage());
                 stop();
             }
-        }, 0, 100, TimeUnit.MILLISECONDS); // 10 instructions/sec
+        }, 0, 100, TimeUnit.MILLISECONDS);
     }
     
     public void pause() {
         isPaused = !isPaused;
         if (isPaused) {
-            cpu.stop();
             log("Exécution en pause");
         } else {
-            cpu.start();
             log("Exécution reprise");
         }
         notifyExecutionStateChange();
@@ -202,7 +172,6 @@ public class SimulatorBackend {
     public void stop() {
         isRunning = false;
         isPaused = false;
-        cpu.stop();
         
         if (executor != null) {
             executor.shutdown();
@@ -219,15 +188,7 @@ public class SimulatorBackend {
         }
         
         try {
-            int cycles = cpu.executeInstruction();
-            instructionCount++;
-            
-            // Notifications après pas à pas
-            notifyAllRegisters();
-            notifyAllFlags();
-            
-            log("Pas à pas exécuté : PC=$" + formatHex16(cpu.getRegisters().getPC()));
-            
+            executeStepInternal();
         } catch (Exception e) {
             log("Erreur pas à pas : " + e.getMessage());
         }
@@ -237,11 +198,37 @@ public class SimulatorBackend {
         stop();
         initialize();
         
+        // Recharger le programme si existant
         if (currentProgram != null) {
             cpu.loadProgram(currentProgram, programStartAddress);
         }
         
         log("Simulateur réinitialisé");
+        notifyAllRegisters();
+        notifyAllFlags();
+    }
+    
+    // ==================== EXÉCUTION INTERNE ====================
+    
+    private void executeStepInternal() {
+        if (cpu.isHalted()) {
+            log("CPU arrêté (HALT)");
+            stop();
+            return;
+        }
+        
+        int pcBefore = cpu.getRegisters().getPC();
+        int cycles = cpu.executeInstruction();
+        instructionCount++;
+        
+        // Log
+        log("Instruction exécutée : PC=$" + String.format("%04X", pcBefore) + 
+            " Cycles=" + cycles);
+        
+        // Notifier
+        notifyExecutionStep(pcBefore, 
+            cpu.getMemory().readByte(pcBefore), 
+            cycles);
         notifyAllRegisters();
         notifyAllFlags();
     }
@@ -272,21 +259,46 @@ public class SimulatorBackend {
         notifyFlagUpdate("C", flags.getCarry());
     }
     
+    // ==================== ACCÈS MEMOIRE ====================
+    
+    public byte readMemory(int address) {
+        return (byte) cpu.getMemory().readByte(address);
+    }
+    
+    public void writeMemory(int address, byte value) {
+        cpu.getMemory().writeByte(address, value);
+        // Pas de notification pour chaque écriture mémoire (trop fréquent)
+    }
+    
+    public int readMemoryWord(int address) {
+        return cpu.getMemory().readWord(address);
+    }
+    
+    public void writeMemoryWord(int address, int value) {
+        cpu.getMemory().writeWord(address, value);
+    }
+    
+    public byte[] getMemoryRange(int start, int length) {
+        byte[] data = new byte[length];
+        for (int i = 0; i < length; i++) {
+            data[i] = (byte) cpu.getMemory().readByte(start + i);
+        }
+        return data;
+    }
+    
     // ==================== ACCÈS REGISTRES ====================
     
-    public int getPC() { return cpu.getRegisters().getPC(); }
-    public int getA() { return cpu.getRegisters().getA(); }
-    public int getB() { return cpu.getRegisters().getB(); }
-    public int getD() { return cpu.getRegisters().getD(); }
-    public int getX() { return cpu.getRegisters().getX(); }
-    public int getY() { return cpu.getRegisters().getY(); }
-    public int getS() { return cpu.getRegisters().getS(); }
-    public int getU() { return cpu.getRegisters().getU(); }
-    public int getDP() { return cpu.getRegisters().getDP(); }
+    public int getPC() {
+        return cpu.getRegisters().getPC();
+    }
     
     public void setPC(int value) {
         cpu.getRegisters().setPC(value);
         notifyRegisterUpdate("PC", value);
+    }
+    
+    public int getA() {
+        return cpu.getRegisters().getA();
     }
     
     public void setA(int value) {
@@ -294,9 +306,17 @@ public class SimulatorBackend {
         notifyRegisterUpdate("A", value);
     }
     
+    public int getB() {
+        return cpu.getRegisters().getB();
+    }
+    
     public void setB(int value) {
         cpu.getRegisters().setB(value);
         notifyRegisterUpdate("B", value);
+    }
+    
+    public int getD() {
+        return cpu.getRegisters().getD();
     }
     
     public void setD(int value) {
@@ -305,9 +325,17 @@ public class SimulatorBackend {
         notifyRegisterUpdate("B", cpu.getRegisters().getB());
     }
     
+    public int getX() {
+        return cpu.getRegisters().getX();
+    }
+    
     public void setX(int value) {
         cpu.getRegisters().setX(value);
         notifyRegisterUpdate("X", value);
+    }
+    
+    public int getY() {
+        return cpu.getRegisters().getY();
     }
     
     public void setY(int value) {
@@ -315,14 +343,26 @@ public class SimulatorBackend {
         notifyRegisterUpdate("Y", value);
     }
     
+    public int getS() {
+        return cpu.getRegisters().getS();
+    }
+    
     public void setS(int value) {
         cpu.getRegisters().setS(value);
         notifyRegisterUpdate("S", value);
     }
     
+    public int getU() {
+        return cpu.getRegisters().getU();
+    }
+    
     public void setU(int value) {
         cpu.getRegisters().setU(value);
         notifyRegisterUpdate("U", value);
+    }
+    
+    public int getDP() {
+        return cpu.getRegisters().getDP();
     }
     
     public void setDP(int value) {
@@ -331,6 +371,20 @@ public class SimulatorBackend {
     }
     
     // ==================== ACCÈS FLAGS ====================
+    
+    public boolean[] getFlags() {
+        StatusFlags flags = cpu.getFlags();
+        return new boolean[] {
+            flags.getEntire(),
+            flags.getFIRQMask(),
+            flags.getHalfCarry(),
+            flags.getIRQMask(),
+            flags.getNegative(),
+            flags.getZero(),
+            flags.getOverflow(),
+            flags.getCarry()
+        };
+    }
     
     public boolean getFlag(String flagName) {
         StatusFlags flags = cpu.getFlags();
@@ -362,42 +416,6 @@ public class SimulatorBackend {
         notifyFlagUpdate(flagName, value);
     }
     
-    // ==================== ACCÈS MÉMOIRE ====================
-    
-    public byte readMemory(int address) {
-        return (byte) cpu.getMemory().readByte(address);
-    }
-    
-    public void writeMemory(int address, byte value) {
-        cpu.getMemory().writeByte(address, value);
-        notifyMemoryUpdate(address, value & 0xFF);
-    }
-    
-    public int readMemoryWord(int address) {
-        return cpu.getMemory().readWord(address);
-    }
-    
-    public void writeMemoryWord(int address, int value) {
-        cpu.getMemory().writeWord(address, value);
-        notifyMemoryUpdate(address, value >> 8);
-        notifyMemoryUpdate(address + 1, value & 0xFF);
-    }
-    
-    public byte[] getMemoryRange(int start, int length) {
-        byte[] data = new byte[length];
-        for (int i = 0; i < length; i++) {
-            data[i] = (byte) cpu.getMemory().readByte(start + i);
-        }
-        return data;
-    }
-    
-    public void writeMemoryRange(int start, byte[] data) {
-        for (int i = 0; i < data.length; i++) {
-            cpu.getMemory().writeByte(start + i, data[i] & 0xFF);
-            notifyMemoryUpdate(start + i, data[i] & 0xFF);
-        }
-    }
-    
     // ==================== LOGGING ====================
     
     private void log(String message) {
@@ -405,7 +423,6 @@ public class SimulatorBackend {
         if (executionLog.size() > 100) {
             executionLog.remove(0);
         }
-        notifyLogMessage(message);
     }
     
     public List<String> getExecutionLog() {
@@ -414,22 +431,41 @@ public class SimulatorBackend {
     
     public void clearLog() {
         executionLog.clear();
-        log("Log effacé");
     }
     
     // ==================== GETTERS/SETTERS ====================
     
-    public CPU getCPU() { return cpu; }
-    public byte[] getCurrentProgram() { return currentProgram; }
-    public int getProgramStartAddress() { return programStartAddress; }
-    public void setProgramStartAddress(int address) { 
-        this.programStartAddress = address & 0xFFFF; 
+    public CPU getCPU() {
+        return cpu;
     }
     
-    public boolean isRunning() { return isRunning; }
-    public boolean isPaused() { return isPaused; }
-    public int getInstructionCount() { return instructionCount; }
-    public long getCycleCount() { return cpu.getCycleCount(); }
+    public byte[] getCurrentProgram() {
+        return currentProgram;
+    }
+    
+    public int getProgramStartAddress() {
+        return programStartAddress;
+    }
+    
+    public void setProgramStartAddress(int address) {
+        this.programStartAddress = address & 0xFFFF;
+    }
+    
+    public boolean isRunning() {
+        return isRunning;
+    }
+    
+    public boolean isPaused() {
+        return isPaused;
+    }
+    
+    public int getInstructionCount() {
+        return instructionCount;
+    }
+    
+    public long getCycleCount() {
+        return cpu.getCycleCount();
+    }
     
     public String getCPUState() {
         return cpu.toString();

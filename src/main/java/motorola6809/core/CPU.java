@@ -42,6 +42,9 @@ public class CPU {
         registers.setPC(startAddress);
     }
     
+    /**
+     * Exécute une seule instruction
+     */
     public int executeInstruction() {
         if (halted) {
             return 0;
@@ -49,7 +52,7 @@ public class CPU {
         
         int opcode = fetch();
         
-        // ← UTILISE LE DÉCODEUR D'INSTRUCTIONS
+        // Décoder et exécuter
         int cycles = InstructionDecoder.decodeAndExecute(this, opcode);
         
         cycleCount += cycles;
@@ -116,10 +119,13 @@ public class CPU {
         return (high << 8) | low;
     }
     
+    
     public void halt() {
         this.halted = true;
         this.running = false;
     }
+    
+    
     
     public void start() {
         this.running = true;

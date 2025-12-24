@@ -7,6 +7,7 @@ public class MainApp extends Application {
     
     @Override
     public void start(Stage primaryStage) {
+
         // Créer et afficher la fenêtre principale
         MenuWindow menuWindow = new MenuWindow();
         menuWindow.show();

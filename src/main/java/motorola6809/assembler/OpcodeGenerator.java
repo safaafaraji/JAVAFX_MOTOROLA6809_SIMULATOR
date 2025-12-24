@@ -498,7 +498,7 @@ public class OpcodeGenerator {
         addOpcode("OPT", "DIRECTIVE", 0x0000);
     
      // TFR et EXG utilisent le même opcode avec un postbyte
-     // Le mode devrait être "INHERENT" mais nécessite un postbyte
+  
       
         addOpcode("PSHS", "IMMEDIATE", 0x34);
         addOpcode("PULS", "IMMEDIATE", 0x35);
@@ -506,7 +506,9 @@ public class OpcodeGenerator {
         addOpcode("PULU", "IMMEDIATE", 0x37);
         addOpcode("TFR", "IMMEDIATE", 0x1F);
         addOpcode("EXG", "IMMEDIATE", 0x1E);
+        addOpcode("ABA", "INHERENT", 0x1B);  // Add B to A
 
+        
      
     }
     
@@ -613,9 +615,9 @@ public class OpcodeGenerator {
             "ASLA", "ASLB", "ASRA", "ASRB", "LSRA", "LSRB",
             "ROLA", "ROLB", "RORA", "RORB",
             
-            // Branch
+           /* // Branch
             "BRA", "BCC", "BCS", "BEQ", "BNE", "BGE", "BLT",
-            "BGT", "BLE", "BHI", "BLS", "BVC", "BVS", "BPL", "BMI",
+            "BGT", "BLE", "BHI", "BLS", "BVC", "BVS", "BPL", "BMI",*/
             
             // Jump/Subroutine
             "JMP", "JSR", "BSR", "RTS", "RTI",

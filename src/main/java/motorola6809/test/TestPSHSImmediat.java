@@ -9,21 +9,20 @@ public class TestPSHSImmediat {
         
         Assembler assembler = new Assembler();
         
-        String program = """
-            ORG $2000
-            
-            ; Test avec postbyte
-            PSHS A,B       ; Postbyte = 00000011 (A=bit0, B=bit1)
-            PULS X,Y       ; Postbyte = 00110000 (X=bit4, Y=bit5)
-            PSHU S,U       ; Postbyte = 01010000 (S=bit4, U=bit5)
-            PULU D,PC      ; Postbyte = 10000001 (D=bit0, PC=bit7)
-            
-            ; TFR et EXG
-            TFR A,B        ; Postbyte = 10001001 (A=0x8, B=0x9)
-            EXG X,Y        ; Postbyte = 00010010 (X=0x1, Y=0x2)
-            
-            END
-            """;
+        String program = 
+        	    "        ORG $2000\n" +
+        	    "\n" +
+        	    "        ; Test avec postbyte\n" +
+        	    "        PSHS A,B,CC,DP      ; Postbyte = 000001111\n" +
+        	    "        PULS X,Y            ; Postbyte = 00110000\n" +
+        	    "        PSHU S,U            ; Postbyte = 01010000\n" +
+        	    "        PULU D,PC           ; Postbyte = 10000001\n" +
+        	    "\n" +
+        	    "        ; TFR et EXG\n" +
+        	    "        TFR A,B             ; Postbyte = 10001001\n" +
+        	    "        EXG X,Y             ; Postbyte = 00010010\n" +
+        	    "\n" +
+        	    "        END\n";
         
         try {
             System.out.println("Assemblage...");

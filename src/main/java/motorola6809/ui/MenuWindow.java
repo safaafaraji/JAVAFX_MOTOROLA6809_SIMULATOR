@@ -393,12 +393,7 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
         });
     }
     
-    @Override
-    public void onLogMessage(String message) {
-        javafx.application.Platform.runLater(() -> {
-            // Les logs sont déjà gérés par updateLog()
-        });
-    }
+    
     
     @Override
     public void close() {
@@ -431,4 +426,10 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
         public String getAscii() { return ascii.get(); }
         public javafx.beans.property.SimpleStringProperty asciiProperty() { return ascii; }
     }
+
+	@Override
+	public void onExecutionStep(int pc, int opcode, int cycles) {
+		// TODO Auto-generated method stub
+		
+	}
 }

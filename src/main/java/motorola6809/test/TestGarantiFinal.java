@@ -8,26 +8,24 @@ public class TestGarantiFinal {
         System.out.println("=== TEST GARANTI 100% ===\n");
         
         // Programme 100% garanti - pas d'étiquettes
-        String program = """
-            ; Programme 100% garanti
-            ; PAS d'étiquettes, PAS de branchements
-            ORG $1400
+        String program = 
+            "; Programme 100% garanti\n"+
+            "; PAS d'étiquettes, PAS de branchements \n"+
+            "ORG $1400\n"+
             
-            LDA #$01
-            LDB #$02
-            ADDA #$03
-            SUBB #$01
-            INCA
-            DECB
-            NOP
-            NOP
-            NOP
+           " LDA #$01\n"+
+           " LDB #$02\n"+
+           " ADDA #$03\n"+
+           " SUBB #$01\n"+
+           " INCA\n"+
+           " DECB\n"+
+           " NOP\n"+
+           " NOP\n"+
+           " NOP\n"+
+           " ; Fin avec adresse absolue\n"+
+           " JMP $1400\n "+
             
-            ; Fin avec adresse absolue
-            JMP $1400
-            
-            END
-            """;
+           " END";
         
         Assembler assembler = new Assembler();
         

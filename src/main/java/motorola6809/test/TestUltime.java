@@ -10,19 +10,18 @@ public class TestUltime {
         Assembler assembler = new Assembler();
         
         // Programme ULTRA SIMPLE avec adresses absolues (pas d'étiquettes)
-        String program = """
-            ORG $1400
-            
-            ; Programme avec adresses ABSOLUES seulement
-            LDA #$01
-            LDB #$02
-            ADDA #$03
-            SUBB #$01
-            NOP
-            JMP $1400    ; Adresse absolue
-            
-            END
-            """;
+        String program =     
+        		"        ORG $1400\n" +
+        	    "\n" +
+        	    "        ; Programme avec adresses ABSOLUES seulement\n" +
+        	    "        LDA #$01\n" +
+        	    "        LDB #$02\n" +
+        	    "        ADDA #$03\n" +
+        	    "        SUBB #$01\n" +
+        	    "        NOP\n" +
+        	    "        JMP $1400           ; Adresse absolue\n" +
+        	    "\n" +
+        	    "        END\n";
         
         try {
             System.out.println("Assemblage...");
