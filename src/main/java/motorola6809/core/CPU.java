@@ -10,6 +10,8 @@ public class CPU {
     private Memory memory;
     private boolean running;
     private boolean halted;
+    private boolean waitingForInterrupt;
+    private boolean sync;
     private long cycleCount;
     
     public CPU() {
@@ -18,6 +20,8 @@ public class CPU {
         this.memory = new Memory();
         this.running = false;
         this.halted = false;
+        this.waitingForInterrupt = false;
+        this.sync = false;
         this.cycleCount = 0;
     }
     
@@ -27,6 +31,8 @@ public class CPU {
         memory.reset();
         running = false;
         halted = false;
+        waitingForInterrupt = false;
+        sync = false;
         cycleCount = 0;
         
         int resetVector = memory.readWord(Constants.VECTOR_RESET);
@@ -46,8 +52,8 @@ public class CPU {
      * Exécute une seule instruction
      */
     public int executeInstruction() {
-        if (halted) {
-            return 0;
+        if (halted || waitingForInterrupt || sync) {
+            return 1; // Un cycle d'attente
         }
         
         int opcode = fetch();
@@ -119,17 +125,16 @@ public class CPU {
         return (high << 8) | low;
     }
     
-    
     public void halt() {
         this.halted = true;
         this.running = false;
     }
     
-    
-    
     public void start() {
         this.running = true;
         this.halted = false;
+        this.waitingForInterrupt = false;
+        this.sync = false;
     }
     
     public void stop() {
@@ -147,6 +152,49 @@ public class CPU {
         while (running && !halted) {
             executeInstruction();
         }
+    }
+    
+    // Nouvelle méthode pour SYNC
+    public void sync() {
+        this.sync = true;
+    }
+    
+    // Nouvelle méthode pour CWAI
+    public void waitForInterrupt() {
+        this.waitingForInterrupt = true;
+    }
+    
+    // Méthode pour gérer les interruptions
+    public void handleInterrupt(int vectorAddress) {
+        waitingForInterrupt = false;
+        sync = false;
+        
+        if (!flags.getFIRQMask() || !flags.getIRQMask()) {
+            pushWordS(registers.getPC());
+            pushWordS(registers.getU());
+            pushWordS(registers.getY());
+            pushWordS(registers.getX());
+            pushS(registers.getDP());
+            pushS(registers.getB());
+            pushS(registers.getA());
+            pushS(flags.getCC());
+            
+            flags.setEntire(true);
+            flags.setFIRQMask(true);
+            flags.setIRQMask(true);
+            
+            int vector = memory.readWord(vectorAddress);
+            registers.setPC(vector);
+        }
+    }
+    
+    // Getters supplémentaires
+    public boolean isWaitingForInterrupt() {
+        return waitingForInterrupt;
+    }
+    
+    public boolean isSync() {
+        return sync;
     }
     
     public Register getRegisters() {
@@ -176,12 +224,14 @@ public class CPU {
     @Override
     public String toString() {
         return String.format(
-            "CPU State:\n%s\n%s\nCycles: %d Running: %b Halted: %b",
+            "CPU State:\n%s\n%s\nCycles: %d Running: %b Halted: %b Wait: %b Sync: %b",
             registers.toString(),
             flags.toString(),
             cycleCount,
             running,
-            halted
+            halted,
+            waitingForInterrupt,
+            sync
         );
     }
 }
