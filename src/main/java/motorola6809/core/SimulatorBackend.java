@@ -449,20 +449,51 @@ public class SimulatorBackend {
     
  // ==================== ACCÈS MEMOIRE AVEC NOTIFICATION ====================
 
-    public byte readMemory(int address) {
-        return (byte) cpu.getMemory().readByte(address);
+ // Variable pour suivre les changements mémoire
+    private List<MemoryChange> memoryChanges = new ArrayList<>();
+
+    private static class MemoryChange {
+        int address;
+        int oldValue;
+        int newValue;
+        
+        MemoryChange(int address, int oldValue, int newValue) {
+            this.address = address;
+            this.oldValue = oldValue;
+            this.newValue = newValue;
+        }
     }
 
+    // Modifier writeMemory pour enregistrer les changements
     public void writeMemory(int address, byte value) {
-        // Écrire en mémoire
-        cpu.getMemory().writeByte(address, value & 0xFF);
+        int oldValue = cpu.getMemory().readByte(address);
+        cpu.getMemory().writeByte(address, value);
+        
+        // Enregistrer le changement
+        memoryChanges.add(new MemoryChange(address, oldValue, value & 0xFF));
         
         // Notifier les observateurs
         notifyMemoryUpdate(address, value & 0xFF);
         
-        // Log
-        log("Mémoire [$" + formatHex16(address) + "] = $" + formatHex8(value));
+        // Debug
+        System.out.println("Écriture mémoire: $" + formatHex16(address) + 
+                          " = $" + formatHex8(value) + 
+                          " (ancien: $" + formatHex8(oldValue) + ")");
     }
+
+    // Méthode pour vérifier les changements récents
+    public List<MemoryChange> getRecentMemoryChanges() {
+        return new ArrayList<>(memoryChanges);
+    }
+
+    public void clearMemoryChanges() {
+        memoryChanges.clear();
+    }
+    public byte readMemory(int address) {
+        return (byte) cpu.getMemory().readByte(address);
+    }
+
+
 
     public void writeMemoryWord(int address, int value) {
         // Écrire le mot (16 bits)
@@ -695,4 +726,7 @@ public class SimulatorBackend {
         }
         return Integer.parseInt(hex, 16);
     }
+    
+    
+    
 }

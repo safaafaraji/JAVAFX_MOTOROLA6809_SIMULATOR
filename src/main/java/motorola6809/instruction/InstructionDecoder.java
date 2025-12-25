@@ -763,6 +763,10 @@ public class InstructionDecoder {
     private static int executeSTA_extended(CPU cpu) {
         int address = cpu.fetchWord();
         int value = cpu.getRegisters().getA();
+        
+        System.out.println("STA extended: écrit A=$" + String.format("%02X", value) + 
+                          " à $" + String.format("%04X", address));
+        
         cpu.getMemory().writeByte(address, value);
         return 5;
     }
@@ -785,10 +789,15 @@ public class InstructionDecoder {
     private static int executeSTB_extended(CPU cpu) {
         int address = cpu.fetchWord();
         int value = cpu.getRegisters().getB();
+        
+        System.out.println("STB extended: écrit B=$" + String.format("%02X", value) + 
+                          " à $" + String.format("%04X", address));
+        
         cpu.getMemory().writeByte(address, value);
         cpu.getFlags().updateNZ8(value);
         return 5;
     }
+
     
     private static int executeSTB_indexed(CPU cpu) {
         int address = decodeIndexedAddress(cpu);
@@ -809,6 +818,10 @@ public class InstructionDecoder {
     private static int executeSTD_extended(CPU cpu) {
         int address = cpu.fetchWord();
         int value = cpu.getRegisters().getD();
+        
+        System.out.println("STD extended: écrit D=$" + String.format("%04X", value) + 
+                          " à $" + String.format("%04X", address));
+        
         cpu.getMemory().writeWord(address, value);
         cpu.getFlags().updateNZ16(value);
         return 6;
