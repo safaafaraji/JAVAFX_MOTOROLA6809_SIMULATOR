@@ -12,18 +12,20 @@ public class Parser {
         public String comment;
         public int lineNumber;
         public boolean isEmpty;
-        public boolean isLabelOnly;  // Indique si la ligne contient seulement une étiquette
+        public boolean isLabelOnly;
+        public boolean isDirective;
         
         public ParsedLine(int lineNumber) {
             this.lineNumber = lineNumber;
             this.isEmpty = false;
             this.isLabelOnly = false;
+            this.isDirective = false;
         }
         
         @Override
         public String toString() {
-            return String.format("Line %d: label='%s', mnemonic='%s', operand='%s', isLabelOnly=%b",
-                lineNumber, label, mnemonic, operand, isLabelOnly);
+            return String.format("Line %d: label='%s', mnemonic='%s', operand='%s', isLabelOnly=%b, isDirective=%b",
+                lineNumber, label, mnemonic, operand, isLabelOnly, isDirective);
         }
     }
     
@@ -54,96 +56,119 @@ public class Parser {
             line = line.substring(0, commentPos).trim();
         }
         
+        // Nettoyer les espaces multiples
+        line = line.replaceAll("\\s+", " ").trim();
+        
         // Séparer en mots
-        String[] parts = line.split("\\s+");
+        String[] parts = line.split(" ");
         if (parts.length == 0) {
             result.isEmpty = true;
             return result;
         }
         
-        // Détecter les directives EQU en premier
-        for (int i = 0; i < parts.length; i++) {
-            if ("EQU".equalsIgnoreCase(parts[i])) {
-                // C'est une directive EQU
-                result.mnemonic = "EQU";
-                if (i > 0) {
-                    result.label = parts[i - 1];
-                }
-                if (i + 1 < parts.length) {
-                    // Rassembler le reste comme opérande
-                    StringBuilder operand = new StringBuilder();
-                    for (int j = i + 1; j < parts.length; j++) {
-                        operand.append(parts[j]);
-                        if (j < parts.length - 1) {
-                            operand.append(" ");
-                        }
-                    }
-                    result.operand = operand.toString();
-                }
-                return result;
+        // Détecter d'abord les directives simples (ORG, END, etc.)
+        String firstWord = parts[0].toUpperCase();
+        
+        // Cas 1: C'est une directive
+        if (isDirective(firstWord)) {
+            result.mnemonic = firstWord;
+            result.isDirective = true;
+            
+            if (parts.length > 1) {
+                result.operand = joinParts(parts, 1);
             }
+            return result;
         }
         
-        // Vérifier si c'est une étiquette (avec :)
-        if (parts[0].endsWith(":")) {
-            result.label = parts[0].substring(0, parts[0].length() - 1);
+        // Cas 2: C'est une étiquette avec deux-points
+        if (firstWord.endsWith(":")) {
+            result.label = firstWord.substring(0, firstWord.length() - 1);
             
             if (parts.length == 1) {
                 // Seulement une étiquette
                 result.isLabelOnly = true;
+                result.isEmpty = true;
                 return result;
             }
             
             // Il y a quelque chose après l'étiquette
-            result.mnemonic = parts[1].toUpperCase();
+            String secondWord = parts[1].toUpperCase();
             
-            if (parts.length > 2) {
-                // Rassembler le reste comme opérande
-                StringBuilder operand = new StringBuilder();
-                for (int i = 2; i < parts.length; i++) {
-                    operand.append(parts[i]);
-                    if (i < parts.length - 1) {
-                        operand.append(" ");
-                    }
+            // Vérifier si c'est une directive
+            if (isDirective(secondWord)) {
+                result.mnemonic = secondWord;
+                result.isDirective = true;
+                
+                if (parts.length > 2) {
+                    result.operand = joinParts(parts, 2);
                 }
-                result.operand = operand.toString();
+            } else {
+                // C'est une instruction
+                result.mnemonic = secondWord;
+                
+                if (parts.length > 2) {
+                    result.operand = joinParts(parts, 2);
+                }
             }
             return result;
         }
         
-        // Vérifier si c'est une directive
-        String firstWord = parts[0].toUpperCase();
-        if (isDirective(firstWord)) {
-            result.mnemonic = firstWord;
+        // Cas 3: Étiquette sans deux-points (commence la ligne)
+        // Vérifier si le premier mot n'est PAS une instruction valide
+        if (!isValidInstruction(firstWord) && !isDirective(firstWord)) {
+            // Alors c'est une étiquette
+            result.label = firstWord;
             
-            if (parts.length > 1) {
-                StringBuilder operand = new StringBuilder();
-                for (int i = 1; i < parts.length; i++) {
-                    operand.append(parts[i]);
-                    if (i < parts.length - 1) {
-                        operand.append(" ");
-                    }
+            if (parts.length == 1) {
+                // Seulement une étiquette
+                result.isLabelOnly = true;
+                result.isEmpty = true;
+                return result;
+            }
+            
+            String secondWord = parts[1].toUpperCase();
+            
+            // Vérifier si c'est une directive
+            if (isDirective(secondWord)) {
+                result.mnemonic = secondWord;
+                result.isDirective = true;
+                
+                if (parts.length > 2) {
+                    result.operand = joinParts(parts, 2);
                 }
-                result.operand = operand.toString();
+            } else {
+                // C'est une instruction
+                result.mnemonic = secondWord;
+                
+                if (parts.length > 2) {
+                    result.operand = joinParts(parts, 2);
+                }
             }
             return result;
         }
         
-        // Si c'est une instruction
+        // Cas 4: C'est une instruction normale
         result.mnemonic = firstWord;
         
         if (parts.length > 1) {
-            StringBuilder operand = new StringBuilder();
-            for (int i = 1; i < parts.length; i++) {
-                operand.append(parts[i]);
-                if (i < parts.length - 1) {
-                    operand.append(" ");
-                }
-            }
-            result.operand = operand.toString();
+            result.operand = joinParts(parts, 1);
         }
         
         return result;
+    }
+    
+    /**
+     * Rejoindre les parties d'un tableau
+     */
+    private static String joinParts(String[] parts, int startIndex) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = startIndex; i < parts.length; i++) {
+            sb.append(parts[i]);
+            if (i < parts.length - 1) {
+                sb.append(" ");
+            }
+        }
+        return sb.toString();
     }
     
     /**
@@ -189,7 +214,7 @@ public class Parser {
     }
     
     /**
-     * Détermine le mode d'adressage (version améliorée avec mnémonique)
+     * Détermine le mode d'adressage
      */
     public static String getAddressingMode(String mnemonic, String operand) {
         if (operand == null || operand.isEmpty()) {
@@ -198,7 +223,7 @@ public class Parser {
         
         operand = operand.trim();
         
-        // Instructions spéciales avec postbyte
+        // Instructions spéciales
         String[] immediateWithRegs = {"PSHS", "PSHU", "PULS", "PULU", "TFR", "EXG"};
         for (String instr : immediateWithRegs) {
             if (instr.equals(mnemonic)) {
@@ -217,7 +242,7 @@ public class Parser {
             return "INDEXED";
         }
         
-        // Mode direct ou étendu (adresses)
+        // Mode direct ou étendu
         if (operand.startsWith("$")) {
             String hex = operand.substring(1);
             if (hex.length() <= 2) {
@@ -229,7 +254,6 @@ public class Parser {
         
         // Si c'est un nombre
         try {
-            // Essayer de parser comme nombre
             if (operand.matches("[0-9]+")) {
                 int value = Integer.parseInt(operand);
                 if (value <= 0xFF) {
@@ -242,12 +266,12 @@ public class Parser {
             // Pas un nombre
         }
         
-        // Sinon, c'est probablement une étiquette = mode étendu
+        // Étiquette = mode étendu
         return "EXTENDED";
     }
     
     /**
-     * Version simplifiée sans mnémonique
+     * Version simplifiée
      */
     public static String getAddressingMode(String operand) {
         return getAddressingMode("", operand);
@@ -266,6 +290,7 @@ public class Parser {
                 lines.add(parsed);
             } catch (Exception e) {
                 System.err.println("Erreur de parsing ligne " + (i + 1) + ": " + e.getMessage());
+                e.printStackTrace();
             }
         }
         
@@ -273,24 +298,44 @@ public class Parser {
     }
     
     /**
+     * Affiche les lignes parsées pour débogage
+     */
+    public static void printParsedLines(List<ParsedLine> lines) {
+        System.out.println("\n=== PARSER DEBUG ===");
+        for (ParsedLine line : lines) {
+            if (!line.isEmpty) {
+                System.out.println(line);
+            } else if (line.comment != null && !line.comment.isEmpty()) {
+                System.out.println("Line " + line.lineNumber + ": COMMENT: " + line.comment);
+            }
+        }
+        System.out.println("====================\n");
+    }
+    
+    /**
      * Test du parser
      */
     public static void main(String[] args) {
         String testCode = 
-            "MAXVAL EQU $FF\n" +
-            "        ORG $1400\n" +
-            "START: LDA #$05\n" +
-            "       STA $1000\n" +
-            "LOOP   DECA\n" +
-            "       BNE LOOP\n" +
-            "       END";
+            "        ORG $1000\n" +
+            "START   LDA #$05     ; Étiquette sans deux-points\n" +
+            "        LDB #$03\n" +
+            "        MUL\n" +
+            "        STA $2000\n" +
+            "        SWI\n" +
+            "        END";
         
         List<ParsedLine> lines = parseProgram(testCode);
+        printParsedLines(lines);
         
-        for (ParsedLine line : lines) {
-            if (!line.isEmpty) {
-                System.out.println(line);
-            }
-        }
+        // Tester aussi avec deux-points
+        String testCode2 = 
+            "        ORG $1000\n" +
+            "START:  LDA #$05     ; Étiquette avec deux-points\n" +
+            "        END";
+        
+        System.out.println("\n=== TEST AVEC DEUX-POINTS ===");
+        List<ParsedLine> lines2 = parseProgram(testCode2);
+        printParsedLines(lines2);
     }
 }

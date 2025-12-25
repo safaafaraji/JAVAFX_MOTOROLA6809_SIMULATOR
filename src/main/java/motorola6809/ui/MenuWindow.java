@@ -126,13 +126,9 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
             "; Tapez votre code assembleur ici\n" +
             "; ============================================\n\n" +
             "        ORG $1000           ; Adresse de départ\n\n" +
-            " START                     \n" +
-            "        LDA #$05           ; Charger 5 dans A\n" +
-            "        LDB #$03           ; Charger 3 dans B\n" +
-            "        MUL                ; Multiplier A * B -> D\n" +
-            "        STA $2000          ; Stocker résultat\n" +
-            "        SWI                ; Retour au système\n\n" +
-            "        END                ; Fin du programme\n"
+            "START:  LDA #$55     ; Étiquette avec :\n" +
+            "        STA $2000\n" +
+            "        END\n"
         );
         
         HBox editorButtons = new HBox(10);

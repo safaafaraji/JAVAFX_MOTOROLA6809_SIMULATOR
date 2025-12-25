@@ -27,25 +27,20 @@ public class Assembler {
         return secondPass(lines);
     }
     
+ // Dans Assembler.java, modifiez la méthode firstPass :
     private void firstPass(List<Parser.ParsedLine> lines) {
         currentAddress = originAddress;
         
         for (Parser.ParsedLine line : lines) {
+            System.out.println("First pass: " + line);
+            
             if (line.isEmpty) continue;
-            
-            System.out.println("First pass: " + line); // DEBUG
-            
-            // Gérer les étiquettes
-            if (line.label != null && !line.label.isEmpty()) {
-                symbolTable.addLabel(line.label, currentAddress);
-                System.out.println("  Label added: " + line.label + " = $" + 
-                                 String.format("%04X", currentAddress)); // DEBUG
-            }
             
             // ORG
             if ("ORG".equals(line.mnemonic)) {
                 currentAddress = parseValue(line.operand);
                 originAddress = currentAddress;
+                System.out.println("  ORG: set address to $" + String.format("%04X", currentAddress));
                 continue;
             }
             
@@ -54,39 +49,43 @@ public class Assembler {
                 if (line.label != null) {
                     int value = parseValue(line.operand);
                     symbolTable.addConstant(line.label, value);
-                    System.out.println("  Constant added: " + line.label + " = $" + 
-                                     String.format("%02X", value)); // DEBUG
+                    System.out.println("  EQU: " + line.label + " = $" + String.format("%04X", value));
                 }
                 continue;
             }
             
             // END
             if ("END".equals(line.mnemonic)) {
+                System.out.println("  END directive");
                 continue;
+            }
+            
+            // Ajouter l'étiquette à la table des symboles
+            if (line.label != null && !line.isLabelOnly) {
+                symbolTable.addLabel(line.label, currentAddress);
+                System.out.println("  Label '" + line.label + "' at $" + String.format("%04X", currentAddress));
             }
             
             // Passer les lignes avec seulement des étiquettes
             if (line.isLabelOnly) {
+                System.out.println("  Label only line, skipping");
                 continue;
             }
             
-            // Si c'est une directive (FCB, FDB, etc.)
-            if (Parser.isDirective(line.mnemonic)) {
-                // Ces directives consomment de l'espace mémoire
-                int size = calculateDirectiveSize(line);
-                currentAddress += size;
+            // Si c'est une directive (autre que ORG/EQU/END), ignorer pour le calcul de taille
+            if (line.isDirective) {
+                System.out.println("  Directive, skipping size calculation");
                 continue;
             }
             
             // Calculer la taille de l'instruction
             int size = getInstructionSize(line);
-            currentAddress += size;
+            System.out.println("  Instruction size: " + size + " bytes");
             
-            System.out.println("  Instruction size: " + size + " bytes"); // DEBUG
+            currentAddress += size;
         }
         
-        System.out.println("First pass complete. Final address: $" + 
-                         String.format("%04X", currentAddress)); // DEBUG
+        System.out.println("First pass complete. Final address: $" + String.format("%04X", currentAddress));
     }
     
     private int calculateDirectiveSize(Parser.ParsedLine line) {
