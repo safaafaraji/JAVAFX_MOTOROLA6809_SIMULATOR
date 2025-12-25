@@ -8,7 +8,7 @@ import java.util.Arrays;
 public class Memory {
     
     private byte[] memory; // Une seule mémoire unifiée de 64KB
-    private MemoryMap memoryMap;
+    private MemoryMap memoryMap;     // sert à dire quelle zone est ROM ou RAM
     
     public Memory() {
         this.memory = new byte[Constants.TOTAL_MEMORY]; // 64KB
