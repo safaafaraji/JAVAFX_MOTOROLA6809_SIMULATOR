@@ -33,6 +33,15 @@ public class Assembler {
         for (Parser.ParsedLine line : lines) {
             if (line.isEmpty) continue;
             
+            System.out.println("First pass: " + line); // DEBUG
+            
+            // Gérer les étiquettes
+            if (line.label != null && !line.label.isEmpty()) {
+                symbolTable.addLabel(line.label, currentAddress);
+                System.out.println("  Label added: " + line.label + " = $" + 
+                                 String.format("%04X", currentAddress)); // DEBUG
+            }
+            
             // ORG
             if ("ORG".equals(line.mnemonic)) {
                 currentAddress = parseValue(line.operand);
@@ -45,6 +54,8 @@ public class Assembler {
                 if (line.label != null) {
                     int value = parseValue(line.operand);
                     symbolTable.addConstant(line.label, value);
+                    System.out.println("  Constant added: " + line.label + " = $" + 
+                                     String.format("%02X", value)); // DEBUG
                 }
                 continue;
             }
@@ -54,15 +65,65 @@ public class Assembler {
                 continue;
             }
             
-            // Ajouter l'étiquette
-            if (line.label != null) {
-                symbolTable.addLabel(line.label, currentAddress);
+            // Passer les lignes avec seulement des étiquettes
+            if (line.isLabelOnly) {
+                continue;
             }
             
-            // Calculer la taille
-            currentAddress += getInstructionSize(line);
+            // Si c'est une directive (FCB, FDB, etc.)
+            if (Parser.isDirective(line.mnemonic)) {
+                // Ces directives consomment de l'espace mémoire
+                int size = calculateDirectiveSize(line);
+                currentAddress += size;
+                continue;
+            }
+            
+            // Calculer la taille de l'instruction
+            int size = getInstructionSize(line);
+            currentAddress += size;
+            
+            System.out.println("  Instruction size: " + size + " bytes"); // DEBUG
+        }
+        
+        System.out.println("First pass complete. Final address: $" + 
+                         String.format("%04X", currentAddress)); // DEBUG
+    }
+    
+    private int calculateDirectiveSize(Parser.ParsedLine line) {
+        if (line.mnemonic == null) return 0;
+        
+        switch (line.mnemonic.toUpperCase()) {
+            case "FCB":
+                if (line.operand != null) {
+                    String[] values = line.operand.split(",");
+                    return values.length;
+                }
+                return 1;
+            case "FDB":
+                if (line.operand != null) {
+                    String[] values = line.operand.split(",");
+                    return values.length * 2;
+                }
+                return 2;
+            case "FCC":
+                if (line.operand != null && line.operand.startsWith("\"")) {
+                    String str = line.operand.substring(1, line.operand.length() - 1);
+                    return str.length();
+                }
+                return 0;
+            case "RMB":
+            case "BSZ":
+            case "ZMB":
+                if (line.operand != null) {
+                    return parseValue(line.operand);
+                }
+                return 0;
+            default:
+                return 0;
         }
     }
+
+    
     
     private byte[] secondPass(List<Parser.ParsedLine> lines) {
         List<Byte> machineCode = new ArrayList<>();
@@ -97,63 +158,114 @@ public class Assembler {
         return result;
     }
     
+ // Dans Assembler.java, modifiez generateInstruction :
+
     private byte[] generateInstruction(Parser.ParsedLine line) {
+        // Vérifier si c'est une directive
+        if (isDirective(line.mnemonic)) {
+            return new byte[0];
+        }
+        
+        // Vérifier si c'est une instruction valide
+        if (!OpcodeGenerator.hasInstruction(line.mnemonic)) {
+            throw new AssemblerException("Instruction inconnue: " + line.mnemonic, line.lineNumber);
+        }
+        
         String mode = Parser.getAddressingMode(line.mnemonic, line.operand);
-        int opcode = OpcodeGenerator.getOpcode(line.mnemonic, mode);
         
-        List<Byte> bytes = new ArrayList<>();
-        bytes.add((byte) opcode);
-        
-        // Opérande
-        if (line.operand != null && !line.operand.isEmpty()) {
-            byte[] operandBytes = encodeOperand(line.operand, mode, line.mnemonic);
-            for (byte b : operandBytes) {
-                bytes.add(b);
+        try {
+            int opcode = OpcodeGenerator.getOpcode(line.mnemonic, mode);
+            
+            List<Byte> bytes = new ArrayList<>();
+            
+            // Gérer les opcodes 16-bit (préfixés)
+            if (opcode > 0xFF) {
+                bytes.add((byte) ((opcode >> 8) & 0xFF)); // Préfixe
+                bytes.add((byte) (opcode & 0xFF));        // Opcode principal
+            } else {
+                bytes.add((byte) opcode);
             }
+            
+            // Opérande
+            if (line.operand != null && !line.operand.isEmpty()) {
+                byte[] operandBytes = encodeOperand(line.operand, mode, line.mnemonic, line.lineNumber);
+                for (byte b : operandBytes) {
+                    bytes.add(b);
+                }
+            }
+            
+            // Conversion
+            byte[] result = new byte[bytes.size()];
+            for (int i = 0; i < bytes.size(); i++) {
+                result[i] = bytes.get(i);
+            }
+            return result;
+            
+        } catch (RuntimeException e) {
+            throw new AssemblerException(
+                "Erreur avec " + line.mnemonic + ": " + e.getMessage(), 
+                line.lineNumber
+            );
         }
-        
-        // Conversion
-        byte[] result = new byte[bytes.size()];
-        for (int i = 0; i < bytes.size(); i++) {
-            result[i] = bytes.get(i);
-        }
-        return result;
     }
-    
-    private byte[] encodeOperand(String operand, String mode, String mnemonic) {
+
+    private byte[] encodeOperand(String operand, String mode, String mnemonic, int lineNumber) {
         operand = operand.trim();
         
         // Mode immédiat
         if ("IMMEDIATE".equals(mode)) {
-            String value = operand.substring(1); // Retire #
+            if (!operand.startsWith("#")) {
+                throw new AssemblerException("Mode immédiat nécessite #", lineNumber);
+            }
+            String value = operand.substring(1);
             int val = parseValue(value);
             
             if (is16BitImmediate(mnemonic)) {
                 return new byte[] { 
                     (byte) (val >> 8), 
-                    (byte) val 
+                    (byte) (val & 0xFF)
                 };
             } else {
-                return new byte[] { (byte) val };
+                return new byte[] { (byte) (val & 0xFF) };
             }
         }
         
         // Mode direct
         if ("DIRECT".equals(mode)) {
             int val = parseValue(operand);
+            if (val < 0 || val > 0xFF) {
+                throw new AssemblerException("Valeur direct doit être 0-255", lineNumber);
+            }
             return new byte[] { (byte) val };
         }
         
         // Mode étendu
         if ("EXTENDED".equals(mode)) {
             int val = parseValue(operand);
+            if (val < 0 || val > 0xFFFF) {
+                throw new AssemblerException("Adresse étendue doit être 0-65535", lineNumber);
+            }
             return new byte[] { 
-                (byte) (val >> 8), 
-                (byte) val 
+                (byte) ((val >> 8) & 0xFF), 
+                (byte) (val & 0xFF)
             };
         }
         
-        return new byte[0];
+        // Mode inhérent - pas d'opérande
+        if ("INHERENT".equals(mode)) {
+            return new byte[0];
+        }
+        
+        // Mode indexé (simplifié)
+        if ("INDEXED".equals(mode)) {
+            // Pour l'instant, simplifions avec ,X seulement
+            if (operand.equals(",X")) {
+                return new byte[] { (byte) 0x84 };
+            }
+            throw new AssemblerException("Mode indexé non supporté: " + operand, lineNumber);
+        }
+        
+        throw new AssemblerException("Mode d'adressage non supporté: " + mode, lineNumber);
     }
     
     private int parseValue(String value) {

@@ -169,6 +169,8 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
         valueLabel.setTextFill(Color.web("#2c3e50"));
         valueLabel.setMinWidth(60);
         valueLabel.setAlignment(Pos.CENTER);
+        valueLabel.setStyle("-fx-background-color: white; -fx-border-color: #ced4da; " +
+                           "-fx-border-width: 1; -fx-padding: 2;");
         
         Label descLabel = new Label(description);
         descLabel.setFont(Font.font("Arial", 9));
@@ -195,7 +197,7 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
         valueLabel.setMinWidth(25);
         valueLabel.setAlignment(Pos.CENTER);
         valueLabel.setStyle("-fx-background-color: white; -fx-border-color: #ced4da; " +
-                           "-fx-border-radius: 3; -fx-padding: 3; -fx-border-width: 2;");
+                           "-fx-border-radius: 3; -fx-padding: 3; -fx-border-width: 1;");
         
         Label descLabel = new Label(description);
         descLabel.setFont(Font.font("Arial", 8));
@@ -214,41 +216,49 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
         if (!autoRefresh) return;
         
         Platform.runLater(() -> {
-            switch (register) {
-                case "PC":
-                    pcLabel.setText(formatHex16(value));
-                    highlightRegister(pcLabel);
-                    break;
-                case "A":
-                    aLabel.setText(formatHex8(value));
-                    dLabel.setText(formatHex16(backend.getD())); // Mettre à jour D aussi
-                    highlightRegister(aLabel);
-                    break;
-                case "B":
-                    bLabel.setText(formatHex8(value));
-                    dLabel.setText(formatHex16(backend.getD())); // Mettre à jour D aussi
-                    highlightRegister(bLabel);
-                    break;
-                case "X":
-                    xLabel.setText(formatHex16(value));
-                    highlightRegister(xLabel);
-                    break;
-                case "Y":
-                    yLabel.setText(formatHex16(value));
-                    highlightRegister(yLabel);
-                    break;
-                case "S":
-                    sLabel.setText(formatHex16(value));
-                    highlightRegister(sLabel);
-                    break;
-                case "U":
-                    uLabel.setText(formatHex16(value));
-                    highlightRegister(uLabel);
-                    break;
-                case "DP":
-                    dpLabel.setText(formatHex8(value));
-                    highlightRegister(dpLabel);
-                    break;
+            try {
+                switch (register) {
+                    case "PC":
+                        pcLabel.setText(formatHex16(value));
+                        highlightRegister(pcLabel);
+                        break;
+                    case "A":
+                        aLabel.setText(formatHex8(value));
+                        dLabel.setText(formatHex16(backend.getD())); // Mettre à jour D aussi
+                        highlightRegister(aLabel);
+                        break;
+                    case "B":
+                        bLabel.setText(formatHex8(value));
+                        dLabel.setText(formatHex16(backend.getD())); // Mettre à jour D aussi
+                        highlightRegister(bLabel);
+                        break;
+                    case "D":
+                        dLabel.setText(formatHex16(value));
+                        highlightRegister(dLabel);
+                        break;
+                    case "X":
+                        xLabel.setText(formatHex16(value));
+                        highlightRegister(xLabel);
+                        break;
+                    case "Y":
+                        yLabel.setText(formatHex16(value));
+                        highlightRegister(yLabel);
+                        break;
+                    case "S":
+                        sLabel.setText(formatHex16(value));
+                        highlightRegister(sLabel);
+                        break;
+                    case "U":
+                        uLabel.setText(formatHex16(value));
+                        highlightRegister(uLabel);
+                        break;
+                    case "DP":
+                        dpLabel.setText(formatHex8(value));
+                        highlightRegister(dpLabel);
+                        break;
+                }
+            } catch (Exception e) {
+                System.err.println("Erreur lors de la mise à jour du registre " + register + ": " + e.getMessage());
             }
         });
     }
@@ -258,15 +268,19 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
         if (!autoRefresh) return;
         
         Platform.runLater(() -> {
-            switch (flag) {
-                case "E": updateFlagDisplay(eLabel, value); break;
-                case "F": updateFlagDisplay(fLabel, value); break;
-                case "H": updateFlagDisplay(hLabel, value); break;
-                case "I": updateFlagDisplay(iLabel, value); break;
-                case "N": updateFlagDisplay(nLabel, value); break;
-                case "Z": updateFlagDisplay(zLabel, value); break;
-                case "V": updateFlagDisplay(vLabel, value); break;
-                case "C": updateFlagDisplay(cLabel, value); break;
+            try {
+                switch (flag) {
+                    case "E": updateFlagDisplay(eLabel, value); break;
+                    case "F": updateFlagDisplay(fLabel, value); break;
+                    case "H": updateFlagDisplay(hLabel, value); break;
+                    case "I": updateFlagDisplay(iLabel, value); break;
+                    case "N": updateFlagDisplay(nLabel, value); break;
+                    case "Z": updateFlagDisplay(zLabel, value); break;
+                    case "V": updateFlagDisplay(vLabel, value); break;
+                    case "C": updateFlagDisplay(cLabel, value); break;
+                }
+            } catch (Exception e) {
+                System.err.println("Erreur lors de la mise à jour du flag " + flag + ": " + e.getMessage());
             }
         });
     }
@@ -279,42 +293,74 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
     @Override
     public void onExecutionStateChange(boolean running, boolean paused) {
         Platform.runLater(() -> {
-            if (running) {
-                if (paused) {
-                    stage.setTitle("Architecture 6809 - ⏸ En pause");
+            try {
+                if (running) {
+                    if (paused) {
+                        stage.setTitle("Architecture 6809 - ⏸ En pause");
+                    } else {
+                        stage.setTitle("Architecture 6809 - ▶ En cours");
+                    }
                 } else {
-                    stage.setTitle("Architecture 6809 - ▶ En cours");
+                    stage.setTitle("Architecture 6809 - ⏹ Arrêté");
                 }
-            } else {
-                stage.setTitle("Architecture 6809 - ⏹ Arrêté");
+                
+                // Rafraîchir tous les registres quand l'état change
+                if (autoRefresh) {
+                    manualRefresh();
+                }
+            } catch (Exception e) {
+                System.err.println("Erreur lors du changement d'état: " + e.getMessage());
             }
         });
     }
     
-    
     @Override
     public void onProgramLoaded(int startAddress, int size) {
         Platform.runLater(() -> {
-            stage.setTitle("Architecture 6809 - Programme chargé (" + size + " octets)");
-            manualRefresh();
+            try {
+                stage.setTitle("Architecture 6809 - Programme chargé (" + size + " octets)");
+                // Rafraîchir tous les registres
+                manualRefresh();
+            } catch (Exception e) {
+                System.err.println("Erreur lors du chargement du programme: " + e.getMessage());
+            }
+        });
+    }
+    
+    @Override
+    public void onExecutionStep(int pc, int opcode, int cycles) {
+        Platform.runLater(() -> {
+            try {
+                // Mettre à jour le titre avec l'adresse courante
+                stage.setTitle("Architecture 6809 - PC: $" + formatHex16(pc));
+            } catch (Exception e) {
+                System.err.println("Erreur lors du pas d'exécution: " + e.getMessage());
+            }
         });
     }
     
     // ==================== MÉTHODES UTILITAIRES ====================
     
     private void highlightRegister(Label label) {
+        // Sauvegarder le style original
+        String originalStyle = label.getStyle();
+        
+        // Appliquer le surlignage
         label.setStyle("-fx-background-color: #e8f5e8; -fx-border-color: #4CAF50; " +
-                      "-fx-border-width: 2; -fx-border-radius: 3;");
+                      "-fx-border-width: 2; -fx-border-radius: 3; " +
+                      "-fx-text-fill: #2c3e50;");
         
         // Retirer le surlignage après 300ms
         new Thread(() -> {
             try {
                 Thread.sleep(300);
                 Platform.runLater(() -> {
-                    label.setStyle("");
+                    label.setStyle(originalStyle);
                 });
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                System.err.println("Erreur lors de la suppression du surlignage: " + e.getMessage());
             }
         }).start();
     }
@@ -324,51 +370,69 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
         flagLabel.setTextFill(value ? Color.GREEN : Color.web("#2c3e50"));
         
         // Animation de changement
+        String originalStyle = flagLabel.getStyle();
         flagLabel.setStyle("-fx-border-color: #FF9800; -fx-border-width: 2;");
+        
         new Thread(() -> {
             try {
                 Thread.sleep(200);
                 Platform.runLater(() -> {
-                    flagLabel.setStyle("-fx-border-color: #ced4da; -fx-border-width: 1;");
+                    flagLabel.setStyle(originalStyle);
                 });
             } catch (InterruptedException e) {
-                e.printStackTrace();
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                System.err.println("Erreur lors de l'animation du flag: " + e.getMessage());
             }
         }).start();
     }
     
     private void manualRefresh() {
-        // Mettre à jour tous les registres
-        pcLabel.setText(formatHex16(backend.getPC()));
-        aLabel.setText(formatHex8(backend.getA()));
-        bLabel.setText(formatHex8(backend.getB()));
-        xLabel.setText(formatHex16(backend.getX()));
-        yLabel.setText(formatHex16(backend.getY()));
-        sLabel.setText(formatHex16(backend.getS()));
-        uLabel.setText(formatHex16(backend.getU()));
-        dpLabel.setText(formatHex8(backend.getDP()));
-        dLabel.setText(formatHex16(backend.getD()));
-        
-        // Mettre à jour tous les flags
-        updateFlagDisplay(eLabel, backend.getFlag("E"));
-        updateFlagDisplay(fLabel, backend.getFlag("F"));
-        updateFlagDisplay(hLabel, backend.getFlag("H"));
-        updateFlagDisplay(iLabel, backend.getFlag("I"));
-        updateFlagDisplay(nLabel, backend.getFlag("N"));
-        updateFlagDisplay(zLabel, backend.getFlag("Z"));
-        updateFlagDisplay(vLabel, backend.getFlag("V"));
-        updateFlagDisplay(cLabel, backend.getFlag("C"));
+        Platform.runLater(() -> {
+            try {
+                // Mettre à jour tous les registres
+                pcLabel.setText(formatHex16(backend.getPC()));
+                aLabel.setText(formatHex8(backend.getA()));
+                bLabel.setText(formatHex8(backend.getB()));
+                xLabel.setText(formatHex16(backend.getX()));
+                yLabel.setText(formatHex16(backend.getY()));
+                sLabel.setText(formatHex16(backend.getS()));
+                uLabel.setText(formatHex16(backend.getU()));
+                dpLabel.setText(formatHex8(backend.getDP()));
+                dLabel.setText(formatHex16(backend.getD()));
+                
+                // Mettre à jour tous les flags
+                updateFlagDisplay(eLabel, backend.getFlag("E"));
+                updateFlagDisplay(fLabel, backend.getFlag("F"));
+                updateFlagDisplay(hLabel, backend.getFlag("H"));
+                updateFlagDisplay(iLabel, backend.getFlag("I"));
+                updateFlagDisplay(nLabel, backend.getFlag("N"));
+                updateFlagDisplay(zLabel, backend.getFlag("Z"));
+                updateFlagDisplay(vLabel, backend.getFlag("V"));
+                updateFlagDisplay(cLabel, backend.getFlag("C"));
+            } catch (Exception e) {
+                System.err.println("Erreur lors du rafraîchissement manuel: " + e.getMessage());
+            }
+        });
     }
     
     private void toggleAutoRefresh() {
         autoRefresh = !autoRefresh;
-        if (autoRefresh) {
-            autoRefreshBtn.setText("✅ Auto-rafraîchir");
-            autoRefreshBtn.setStyle("-fx-background-color: #2ecc71; -fx-text-fill: white;");
-        } else {
-            autoRefreshBtn.setText("⭕ Auto-rafraîchir");
-            autoRefreshBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
-        }
+        Platform.runLater(() -> {
+            try {
+                if (autoRefresh) {
+                    autoRefreshBtn.setText("✅ Auto-rafraîchir");
+                    autoRefreshBtn.setStyle("-fx-background-color: #2ecc71; -fx-text-fill: white;");
+                    // Rafraîchir immédiatement quand on active
+                    manualRefresh();
+                } else {
+                    autoRefreshBtn.setText("⭕ Auto-rafraîchir");
+                    autoRefreshBtn.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
+                }
+            } catch (Exception e) {
+                System.err.println("Erreur lors du basculement auto-refresh: " + e.getMessage());
+            }
+        });
     }
     
     private String formatHex16(int value) {
@@ -380,110 +444,128 @@ public class ArchitectureWindow implements SimulatorBackend.SimulatorObserver {
     }
     
     private void openRegisterEditor() {
-        // Fenêtre d'édition des registres
-        Stage editorStage = new Stage();
-        editorStage.setTitle("Éditeur de Registres");
-        
-        VBox root = new VBox(10);
-        root.setPadding(new Insets(15));
-        
-        GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
-        
-        // Champs d'édition
-        TextField[] fields = new TextField[8];
-        String[] labels = {"PC", "A", "B", "X", "Y", "S", "U", "DP"};
-        int[] values = {
-            backend.getPC(), backend.getA(), backend.getB(),
-            backend.getX(), backend.getY(), backend.getS(),
-            backend.getU(), backend.getDP()
-        };
-        int[] bits = {16, 8, 8, 16, 16, 16, 16, 8};
-        
-        for (int i = 0; i < labels.length; i++) {
-            grid.add(new Label(labels[i] + ":"), 0, i);
-            fields[i] = new TextField();
-            fields[i].setText(bits[i] == 16 ? formatHex16(values[i]) : formatHex8(values[i]));
-            fields[i].setPrefWidth(80);
-            fields[i].setUserData(new Object[]{labels[i], bits[i]});
-            grid.add(fields[i], 1, i);
-        }
-        
-        Button applyBtn = new Button("Appliquer");
-        applyBtn.setOnAction(e -> {
-            for (TextField field : fields) {
-                try {
-                    Object[] data = (Object[]) field.getUserData();
-                    String regName = (String) data[0];
-                    int bitsSize = (int) data[1];
-                    String text = field.getText().trim();
-                    
-                    if (text.isEmpty()) continue;
-                    
-                    int value = Integer.parseInt(text.replace("$", ""), 16);
-                    
-                    switch (regName) {
-                        case "PC": backend.setPC(value); break;
-                        case "A": backend.setA(value); break;
-                        case "B": backend.setB(value); break;
-                        case "X": backend.setX(value); break;
-                        case "Y": backend.setY(value); break;
-                        case "S": backend.setS(value); break;
-                        case "U": backend.setU(value); break;
-                        case "DP": backend.setDP(value); break;
-                    }
-                    
-                } catch (NumberFormatException ex) {
-                    showAlert("Erreur", "Valeur invalide: " + field.getText());
+        Platform.runLater(() -> {
+            try {
+                // Fenêtre d'édition des registres
+                Stage editorStage = new Stage();
+                editorStage.setTitle("Éditeur de Registres");
+                
+                VBox root = new VBox(10);
+                root.setPadding(new Insets(15));
+                
+                GridPane grid = new GridPane();
+                grid.setHgap(10);
+                grid.setVgap(10);
+                
+                // Champs d'édition
+                TextField[] fields = new TextField[8];
+                String[] labels = {"PC", "A", "B", "X", "Y", "S", "U", "DP"};
+                int[] values = {
+                    backend.getPC(), backend.getA(), backend.getB(),
+                    backend.getX(), backend.getY(), backend.getS(),
+                    backend.getU(), backend.getDP()
+                };
+                int[] bits = {16, 8, 8, 16, 16, 16, 16, 8};
+                
+                for (int i = 0; i < labels.length; i++) {
+                    grid.add(new Label(labels[i] + ":"), 0, i);
+                    fields[i] = new TextField();
+                    fields[i].setText(bits[i] == 16 ? formatHex16(values[i]) : formatHex8(values[i]));
+                    fields[i].setPrefWidth(80);
+                    fields[i].setUserData(new Object[]{labels[i], bits[i]});
+                    grid.add(fields[i], 1, i);
                 }
+                
+                Button applyBtn = new Button("Appliquer");
+                applyBtn.setOnAction(e -> {
+                    for (TextField field : fields) {
+                        try {
+                            Object[] data = (Object[]) field.getUserData();
+                            String regName = (String) data[0];
+                            int bitsSize = (int) data[1];
+                            String text = field.getText().trim();
+                            
+                            if (text.isEmpty()) continue;
+                            
+                            int value;
+                            if (text.startsWith("$")) {
+                                value = Integer.parseInt(text.substring(1), 16);
+                            } else if (text.startsWith("0x")) {
+                                value = Integer.parseInt(text.substring(2), 16);
+                            } else {
+                                value = Integer.parseInt(text, 16);
+                            }
+                            
+                            switch (regName) {
+                                case "PC": backend.setPC(value); break;
+                                case "A": backend.setA(value); break;
+                                case "B": backend.setB(value); break;
+                                case "X": backend.setX(value); break;
+                                case "Y": backend.setY(value); break;
+                                case "S": backend.setS(value); break;
+                                case "U": backend.setU(value); break;
+                                case "DP": backend.setDP(value); break;
+                            }
+                            
+                        } catch (NumberFormatException ex) {
+                            showAlert("Erreur", "Valeur hexadécimale invalide: " + field.getText());
+                        }
+                    }
+                    editorStage.close();
+                    // Rafraîchir l'affichage
+                    manualRefresh();
+                });
+                
+                Button cancelBtn = new Button("Annuler");
+                cancelBtn.setOnAction(e -> editorStage.close());
+                
+                HBox buttons = new HBox(10);
+                buttons.getChildren().addAll(applyBtn, cancelBtn);
+                
+                root.getChildren().addAll(new Label("Modifier les registres:"), grid, buttons);
+                
+                Scene scene = new Scene(root, 250, 350);
+                editorStage.setScene(scene);
+                editorStage.show();
+            } catch (Exception e) {
+                System.err.println("Erreur lors de l'ouverture de l'éditeur: " + e.getMessage());
             }
-            editorStage.close();
         });
-        
-        Button cancelBtn = new Button("Annuler");
-        cancelBtn.setOnAction(e -> editorStage.close());
-        
-        HBox buttons = new HBox(10);
-        buttons.getChildren().addAll(applyBtn, cancelBtn);
-        
-        root.getChildren().addAll(new Label("Modifier les registres:"), grid, buttons);
-        
-        Scene scene = new Scene(root, 250, 350);
-        editorStage.setScene(scene);
-        editorStage.show();
     }
     
     private void showAlert(String title, String message) {
-        Alert alert = new Alert(Alert.AlertType.WARNING);
-        alert.setTitle(title);
-        alert.setHeaderText(null);
-        alert.setContentText(message);
-        alert.showAndWait();
+        Platform.runLater(() -> {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle(title);
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
+        });
     }
     
     public void show() {
-        stage.show();
+        Platform.runLater(() -> {
+            try {
+                stage.show();
+                // Rafraîchir l'affichage quand la fenêtre s'ouvre
+                manualRefresh();
+            } catch (Exception e) {
+                System.err.println("Erreur lors de l'affichage de la fenêtre: " + e.getMessage());
+            }
+        });
     }
     
     public void hide() {
-        stage.hide();
+        Platform.runLater(() -> {
+            try {
+                stage.hide();
+            } catch (Exception e) {
+                System.err.println("Erreur lors du masquage de la fenêtre: " + e.getMessage());
+            }
+        });
     }
     
     public boolean isShowing() {
         return stage.isShowing();
     }
-
-  
-
-    @Override
-    public void onExecutionStep(int pc, int opcode, int cycles) {
-        Platform.runLater(() -> {
-            // Mettre à jour l'affichage de l'instruction courante 
-           stage.setTitle("Architecture 6809 - PC: $" + formatHex16(pc));
-        });
-    }
-    
-   
- 
 }

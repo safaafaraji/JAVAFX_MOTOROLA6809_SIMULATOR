@@ -48,11 +48,11 @@ public class Memory {
         address &= Constants.MASK_16BIT;
         value &= 0xFF;
         
-        // Vérifier si on écrit dans la ROM (écriture interdite)
+        // Vérifier si on écrit dans la ROM
         if (memoryMap.isROM(address)) {
-            // La ROM est en lecture seule, on ignore l'écriture
-            // Mais pour le simulateur, on permet l'écriture
+            // Pour le simulateur, on permet l'écriture mais on log
             System.out.println("⚠️ Écriture en ROM à $" + String.format("%04X", address));
+            // Vous pouvez commenter cette ligne pour permettre l'écriture
         }
         
         memory[address] = (byte) value;

@@ -240,6 +240,11 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
         memBox.getChildren().addAll(ramBtn, romBtn);
         
         sidebar.getChildren().addAll(windowsLabel, windowsBox, ctrlLabel, ctrlBox, memLabel, memBox);
+        Button memBtn = createSidebarButton("💾 Vue Mémoire", "#34495e");
+        memBtn.setOnAction(e -> {
+            MemoryWindow memWindow = new MemoryWindow(backend);
+            memWindow.show();
+        });
         return sidebar;
     }
     

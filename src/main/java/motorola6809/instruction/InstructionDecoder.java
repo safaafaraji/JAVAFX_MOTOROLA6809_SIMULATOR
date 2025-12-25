@@ -9,65 +9,36 @@ public class InstructionDecoder {
     public static int decodeAndExecute(CPU cpu, int opcode) {
         int cycles = 0;
         
-        // Log détaillé
+        // Log minimal pour performance
         int currentPC = cpu.getRegisters().getPC() - 1;
-        String opcodeStr = String.format("%02X", opcode);
-        
-        System.out.print("Décodage opcode: 0x" + opcodeStr + 
-                        " @ PC=$" + String.format("%04X", currentPC));
-        
-        // Afficher la mémoire autour du PC pour debug
-        System.out.print(" [Mémoire: ");
-        for (int i = -2; i <= 2; i++) {
-            int addr = currentPC + i;
-            if (addr >= 0 && addr < 0xFFFF) {
-                System.out.print(String.format("%02X ", cpu.getMemory().readByte(addr)));
-            }
-        }
-        System.out.print("] ");
         
         switch (opcode) {
-            // ==================== NOP et STOP ====================
-            case 0x12: // NOP
-                System.out.println("-> NOP");
-                cycles = executeNOP(cpu);
-                break;
-                
             // ==================== LOAD INSTRUCTIONS ====================
             case 0x86: // LDA #imm
-                System.out.println("-> LDA #imm");
                 cycles = executeLDA_immediate(cpu);
                 break;
             case 0x96: // LDA dir
-                System.out.println("-> LDA dir");
                 cycles = executeLDA_direct(cpu);
                 break;
             case 0xB6: // LDA ext
-                System.out.println("-> LDA ext");
                 cycles = executeLDA_extended(cpu);
                 break;
             case 0xA6: // LDA idx
-                System.out.println("-> LDA idx");
                 cycles = executeLDA_indexed(cpu);
                 break;
                 
             case 0xC6: // LDB #imm
-                System.out.println("-> LDB #imm");
                 cycles = executeLDB_immediate(cpu);
                 break;
             case 0xD6: // LDB dir
-                System.out.println("-> LDB dir");
                 cycles = executeLDB_direct(cpu);
                 break;
             case 0xF6: // LDB ext
-                System.out.println("-> LDB ext");
                 cycles = executeLDB_extended(cpu);
                 break;
             case 0xE6: // LDB idx
-                System.out.println("-> LDB idx");
                 cycles = executeLDB_indexed(cpu);
                 break;
-                
                 
             case 0xCC: // LDD #imm
                 cycles = executeLDD_immediate(cpu);
@@ -108,33 +79,6 @@ public class InstructionDecoder {
                 cycles = executeLDU_indexed(cpu);
                 break;
                 
-            // LDY, LDS utilisent le préfixe 0x10
-            case 0x108E: // LDY #imm (préfixe 0x10 + 0x8E)
-                cycles = executeLDY_immediate(cpu);
-                break;
-            case 0x109E: // LDY dir
-                cycles = executeLDY_direct(cpu);
-                break;
-            case 0x10BE: // LDY ext
-                cycles = executeLDY_extended(cpu);
-                break;
-            case 0x10AE: // LDY idx
-                cycles = executeLDY_indexed(cpu);
-                break;
-                
-            case 0x10CE: // LDS #imm
-                cycles = executeLDS_immediate(cpu);
-                break;
-            case 0x10DE: // LDS dir
-                cycles = executeLDS_direct(cpu);
-                break;
-            case 0x10FE: // LDS ext
-                cycles = executeLDS_extended(cpu);
-                break;
-            case 0x10EE: // LDS idx
-                cycles = executeLDS_indexed(cpu);
-                break;
-                
             // ==================== STORE INSTRUCTIONS ====================
             case 0x97: // STA dir
                 cycles = executeSTA_direct(cpu);
@@ -169,8 +113,8 @@ public class InstructionDecoder {
             case 0x9F: // STX dir
                 cycles = executeSTX_direct(cpu);
                 break;
-            case 0xBF: // STX ext
-                cycles = executeSTX_extended(cpu);
+            case 0xFF: // STU ext - C'EST LE PROBLÈME !
+                cycles = executeSTU_extended(cpu);
                 break;
             case 0xAF: // STX idx
                 cycles = executeSTX_indexed(cpu);
@@ -179,32 +123,9 @@ public class InstructionDecoder {
             case 0xDF: // STU dir
                 cycles = executeSTU_direct(cpu);
                 break;
-            case 0xFF: // STU ext
-                cycles = executeSTU_extended(cpu);
-                break;
+
             case 0xEF: // STU idx
                 cycles = executeSTU_indexed(cpu);
-                break;
-                
-            // STY, STS utilisent le préfixe 0x10
-            case 0x109F: // STY dir
-                cycles = executeSTY_direct(cpu);
-                break;
-            case 0x10BF: // STY ext
-                cycles = executeSTY_extended(cpu);
-                break;
-            case 0x10AF: // STY idx
-                cycles = executeSTY_indexed(cpu);
-                break;
-                
-            case 0x10DF: // STS dir
-                cycles = executeSTS_direct(cpu);
-                break;
-            case 0x10FF: // STS ext
-                cycles = executeSTS_extended(cpu);
-                break;
-            case 0x10EF: // STS idx
-                cycles = executeSTS_indexed(cpu);
                 break;
                 
             // ==================== ARITHMETIC INSTRUCTIONS ====================
@@ -477,45 +398,6 @@ public class InstructionDecoder {
                 cycles = executeCMPB_indexed(cpu);
                 break;
                 
-            case 0x1083: // CMPD #imm
-                cycles = executeCMPD_immediate(cpu);
-                break;
-            case 0x1093: // CMPD dir
-                cycles = executeCMPD_direct(cpu);
-                break;
-            case 0x10B3: // CMPD ext
-                cycles = executeCMPD_extended(cpu);
-                break;
-            case 0x10A3: // CMPD idx
-                cycles = executeCMPD_indexed(cpu);
-                break;
-                
-            case 0x8C: // CMPX #imm
-                cycles = executeCMPX_immediate(cpu);
-                break;
-            case 0x9C: // CMPX dir
-                cycles = executeCMPX_direct(cpu);
-                break;
-            case 0xBC: // CMPX ext
-                cycles = executeCMPX_extended(cpu);
-                break;
-            case 0xAC: // CMPX idx
-                cycles = executeCMPX_indexed(cpu);
-                break;
-                
-            case 0x108C: // CMPY #imm
-                cycles = executeCMPY_immediate(cpu);
-                break;
-            case 0x109C: // CMPY dir
-                cycles = executeCMPY_direct(cpu);
-                break;
-            case 0x10BC: // CMPY ext
-                cycles = executeCMPY_extended(cpu);
-                break;
-            case 0x10AC: // CMPY idx
-                cycles = executeCMPY_indexed(cpu);
-                break;
-                
             case 0x4D: // TSTA
                 cycles = executeTSTA(cpu);
                 break;
@@ -564,7 +446,7 @@ public class InstructionDecoder {
                 cycles = executeRTI(cpu);
                 break;
                 
-            // Branchements conditionnels (relatifs)
+            // Branchements conditionnels
             case 0x20: // BRA
                 cycles = executeBRA_relative(cpu);
                 break;
@@ -614,7 +496,6 @@ public class InstructionDecoder {
                 cycles = executeBLE_relative(cpu);
                 break;
                 
-            // Branchements longs
             case 0x16: // LBRA
                 cycles = executeLBRA_relative(cpu);
                 break;
@@ -631,26 +512,17 @@ public class InstructionDecoder {
                 break;
                 
             // ==================== MISC INSTRUCTIONS ====================
-            
-         
+            case 0x12: // NOP
+                cycles = executeNOP(cpu);
+                break;
+            case 0x13: // SYNC
+                cycles = executeSYNC(cpu);
+                break;
             case 0x3C: // CWAI #imm
                 cycles = executeCWAI_immediate(cpu);
                 break;
-                
-
-                
-            case 0x3F: // SWI
-                System.out.println("-> SWI");
+            case 0x3F: // SWI - CORRECTEMENT IMPLÉMENTÉ
                 cycles = executeSWI(cpu);
-                break;
-                
-
-    
-            case 0x103F: // SWI2
-                cycles = executeSWI2(cpu);
-                break;
-            case 0x113F: // SWI3
-                cycles = executeSWI3(cpu);
                 break;
                 
             case 0x4F: // CLRA
@@ -704,27 +576,21 @@ public class InstructionDecoder {
                 cycles = executeLEAU(cpu);
                 break;
                 
-                
-                
             default:
-                // Vérifier les opcodes préfixés (LDY, LDS, etc.)
+                // Pour 0xFF, c'est STU extended - on devrait l'arrêter
                 if ((opcode & 0xFF00) == 0x1000) {
                     cycles = handlePrefixedOpcode(cpu, opcode);
                 } else {
-                    System.err.println("\n OPCODE INCONNU: 0x" + String.format("%04X", opcode) + 
+                    System.err.println("Opcode inconnu: 0x" + String.format("%02X", opcode) + 
                                      " à PC=0x" + String.format("%04X", currentPC));
-                    System.err.println("Le CPU va s'arrêter.");
                     cpu.halt();
                     cycles = 0;
                 }
+
         }
         
-        System.out.println("  Cycles: " + cycles + ", PC maintenant: $" + 
-                          String.format("%04X", cpu.getRegisters().getPC()));
         return cycles;
     }
-    
-
     
     // ==================== MÉTHODES D'EXÉCUTION ====================
     
@@ -736,7 +602,6 @@ public class InstructionDecoder {
         int value = cpu.fetchByte();
         cpu.getRegisters().setA(value);
         cpu.getFlags().updateNZ8(value);
-        System.out.println("    LDA #$" + String.format("%02X", value));
         return 2;
     }
     
@@ -745,8 +610,6 @@ public class InstructionDecoder {
         int value = cpu.getMemory().readByte(address);
         cpu.getRegisters().setA(value);
         cpu.getFlags().updateNZ8(value);
-        System.out.println("    LDA $" + String.format("%02X", address) + 
-                          " = $" + String.format("%02X", value));
         return 4;
     }
     
@@ -755,8 +618,6 @@ public class InstructionDecoder {
         int value = cpu.getMemory().readByte(address);
         cpu.getRegisters().setA(value);
         cpu.getFlags().updateNZ8(value);
-        System.out.println("    LDA $" + String.format("%04X", address) + 
-                          " = $" + String.format("%02X", value));
         return 5;
     }
     
@@ -765,8 +626,6 @@ public class InstructionDecoder {
         int value = cpu.getMemory().readByte(address);
         cpu.getRegisters().setA(value);
         cpu.getFlags().updateNZ8(value);
-        System.out.println("    LDA [indexed] $" + String.format("%04X", address) + 
-                          " = $" + String.format("%02X", value));
         return 5;
     }
     
@@ -774,7 +633,6 @@ public class InstructionDecoder {
         int value = cpu.fetchByte();
         cpu.getRegisters().setB(value);
         cpu.getFlags().updateNZ8(value);
-        System.out.println("    LDB #$" + String.format("%02X", value));
         return 2;
     }
     
@@ -895,70 +753,6 @@ public class InstructionDecoder {
         return 6;
     }
     
-    private static int executeLDY_immediate(CPU cpu) {
-        int value = cpu.fetchWord();
-        cpu.getRegisters().setY(value);
-        cpu.getFlags().updateNZ16(value);
-        return 4;
-    }
-    
-    private static int executeLDY_direct(CPU cpu) {
-        int address = cpu.fetchByte();
-        int value = cpu.getMemory().readWord(address);
-        cpu.getRegisters().setY(value);
-        cpu.getFlags().updateNZ16(value);
-        return 6;
-    }
-    
-    private static int executeLDY_extended(CPU cpu) {
-        int address = cpu.fetchWord();
-        int value = cpu.getMemory().readWord(address);
-        cpu.getRegisters().setY(value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    private static int executeLDY_indexed(CPU cpu) {
-        int address = decodeIndexedAddress(cpu);
-        int value = cpu.getMemory().readWord(address);
-        cpu.getRegisters().setY(value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    private static int executeLDS_immediate(CPU cpu) {
-        int value = cpu.fetchWord();
-        cpu.getRegisters().setS(value);
-        cpu.getFlags().updateNZ16(value);
-        return 4;
-    }
-    
-    private static int executeLDS_direct(CPU cpu) {
-        int address = cpu.fetchByte();
-        int value = cpu.getMemory().readWord(address);
-        cpu.getRegisters().setS(value);
-        cpu.getFlags().updateNZ16(value);
-        return 6;
-    }
-    
-    private static int executeLDS_extended(CPU cpu) {
-        int address = cpu.fetchWord();
-        int value = cpu.getMemory().readWord(address);
-        cpu.getRegisters().setS(value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    private static int executeLDS_indexed(CPU cpu) {
-        int address = decodeIndexedAddress(cpu);
-        int value = cpu.getMemory().readWord(address);
-        cpu.getRegisters().setS(value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    // ==================== STORE INSTRUCTIONS ====================
-    
     private static int executeSTA_direct(CPU cpu) {
         int address = cpu.fetchByte();
         int value = cpu.getRegisters().getA();
@@ -1075,56 +869,6 @@ public class InstructionDecoder {
         cpu.getFlags().updateNZ16(value);
         return 6;
     }
-    
-    private static int executeSTY_direct(CPU cpu) {
-        int address = cpu.fetchByte();
-        int value = cpu.getRegisters().getY();
-        cpu.getMemory().writeWord(address, value);
-        cpu.getFlags().updateNZ16(value);
-        return 6;
-    }
-    
-    private static int executeSTY_extended(CPU cpu) {
-        int address = cpu.fetchWord();
-        int value = cpu.getRegisters().getY();
-        cpu.getMemory().writeWord(address, value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    private static int executeSTY_indexed(CPU cpu) {
-        int address = decodeIndexedAddress(cpu);
-        int value = cpu.getRegisters().getY();
-        cpu.getMemory().writeWord(address, value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    private static int executeSTS_direct(CPU cpu) {
-        int address = cpu.fetchByte();
-        int value = cpu.getRegisters().getS();
-        cpu.getMemory().writeWord(address, value);
-        cpu.getFlags().updateNZ16(value);
-        return 6;
-    }
-    
-    private static int executeSTS_extended(CPU cpu) {
-        int address = cpu.fetchWord();
-        int value = cpu.getRegisters().getS();
-        cpu.getMemory().writeWord(address, value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    private static int executeSTS_indexed(CPU cpu) {
-        int address = decodeIndexedAddress(cpu);
-        int value = cpu.getRegisters().getS();
-        cpu.getMemory().writeWord(address, value);
-        cpu.getFlags().updateNZ16(value);
-        return 7;
-    }
-    
-    // ==================== ARITHMETIC INSTRUCTIONS ====================
     
     private static int executeADDA_immediate(CPU cpu) {
         int a = cpu.getRegisters().getA();
@@ -1369,8 +1113,6 @@ public class InstructionDecoder {
         return 2;
     }
     
-    // ==================== INCREMENT/DECREMENT ====================
-    
     private static int executeINCA(CPU cpu) {
         int a = cpu.getRegisters().getA();
         int result = (a + 1) & 0xFF;
@@ -1457,8 +1199,6 @@ public class InstructionDecoder {
         return 7;
     }
     
-    // ==================== MULTIPLY/DAA ====================
-    
     private static int executeMUL(CPU cpu) {
         int a = cpu.getRegisters().getA();
         int b = cpu.getRegisters().getB();
@@ -1492,8 +1232,6 @@ public class InstructionDecoder {
         
         return 2;
     }
-    
-    // ==================== LOGICAL INSTRUCTIONS ====================
     
     private static int executeANDA_immediate(CPU cpu) {
         int a = cpu.getRegisters().getA();
@@ -1836,8 +1574,6 @@ public class InstructionDecoder {
         return 7;
     }
     
-    // ==================== COMPARE/TEST ====================
-    
     private static int executeCMPA_immediate(CPU cpu) {
         int a = cpu.getRegisters().getA();
         int value = cpu.fetchByte();
@@ -1908,111 +1644,6 @@ public class InstructionDecoder {
         return 5;
     }
     
-    private static int executeCMPD_immediate(CPU cpu) {
-        int d = cpu.getRegisters().getD();
-        int value = cpu.fetchWord();
-        int result = d - value;
-        cpu.getFlags().updateFlagsSub16(d, value, result);
-        return 5;
-    }
-    
-    private static int executeCMPD_direct(CPU cpu) {
-        int d = cpu.getRegisters().getD();
-        int address = cpu.fetchByte();
-        int value = cpu.getMemory().readWord(address);
-        int result = d - value;
-        cpu.getFlags().updateFlagsSub16(d, value, result);
-        return 7;
-    }
-    
-    private static int executeCMPD_extended(CPU cpu) {
-        int d = cpu.getRegisters().getD();
-        int address = cpu.fetchWord();
-        int value = cpu.getMemory().readWord(address);
-        int result = d - value;
-        cpu.getFlags().updateFlagsSub16(d, value, result);
-        return 8;
-    }
-    
-    private static int executeCMPD_indexed(CPU cpu) {
-        int d = cpu.getRegisters().getD();
-        int address = decodeIndexedAddress(cpu);
-        int value = cpu.getMemory().readWord(address);
-        int result = d - value;
-        cpu.getFlags().updateFlagsSub16(d, value, result);
-        return 8;
-    }
-    
-    private static int executeCMPX_immediate(CPU cpu) {
-        int x = cpu.getRegisters().getX();
-        int value = cpu.fetchWord();
-        int result = x - value;
-        cpu.getFlags().updateFlagsSub16(x, value, result);
-        return 4;
-    }
-    
-    private static int executeCMPX_direct(CPU cpu) {
-        int x = cpu.getRegisters().getX();
-        int address = cpu.fetchByte();
-        int value = cpu.getMemory().readWord(address);
-        int result = x - value;
-        cpu.getFlags().updateFlagsSub16(x, value, result);
-        return 6;
-    }
-    
-    private static int executeCMPX_extended(CPU cpu) {
-        int x = cpu.getRegisters().getX();
-        int address = cpu.fetchWord();
-        int value = cpu.getMemory().readWord(address);
-        int result = x - value;
-        cpu.getFlags().updateFlagsSub16(x, value, result);
-        return 7;
-    }
-    
-    private static int executeCMPX_indexed(CPU cpu) {
-        int x = cpu.getRegisters().getX();
-        int address = decodeIndexedAddress(cpu);
-        int value = cpu.getMemory().readWord(address);
-        int result = x - value;
-        cpu.getFlags().updateFlagsSub16(x, value, result);
-        return 7;
-    }
-    
-    private static int executeCMPY_immediate(CPU cpu) {
-        int y = cpu.getRegisters().getY();
-        int value = cpu.fetchWord();
-        int result = y - value;
-        cpu.getFlags().updateFlagsSub16(y, value, result);
-        return 5;
-    }
-    
-    private static int executeCMPY_direct(CPU cpu) {
-        int y = cpu.getRegisters().getY();
-        int address = cpu.fetchByte();
-        int value = cpu.getMemory().readWord(address);
-        int result = y - value;
-        cpu.getFlags().updateFlagsSub16(y, value, result);
-        return 7;
-    }
-    
-    private static int executeCMPY_extended(CPU cpu) {
-        int y = cpu.getRegisters().getY();
-        int address = cpu.fetchWord();
-        int value = cpu.getMemory().readWord(address);
-        int result = y - value;
-        cpu.getFlags().updateFlagsSub16(y, value, result);
-        return 8;
-    }
-    
-    private static int executeCMPY_indexed(CPU cpu) {
-        int y = cpu.getRegisters().getY();
-        int address = decodeIndexedAddress(cpu);
-        int value = cpu.getMemory().readWord(address);
-        int result = y - value;
-        cpu.getFlags().updateFlagsSub16(y, value, result);
-        return 8;
-    }
-    
     private static int executeTSTA(CPU cpu) {
         int a = cpu.getRegisters().getA();
         cpu.getFlags().updateNZ8(a);
@@ -2050,8 +1681,6 @@ public class InstructionDecoder {
         cpu.getFlags().setCarry(false);
         return 7;
     }
-    
-    // ==================== JUMP/BRANCH ====================
     
     private static int executeJMP_direct(CPU cpu) {
         int address = cpu.fetchByte();
@@ -2111,7 +1740,6 @@ public class InstructionDecoder {
         cpu.getFlags().setCC(cc);
         
         if (cpu.getFlags().getEntire()) {
-            // Restauration complète
             int a = cpu.popS();
             int b = cpu.popS();
             int dp = cpu.popS();
@@ -2129,7 +1757,6 @@ public class InstructionDecoder {
             cpu.getRegisters().setPC(pc);
             return 15;
         } else {
-            // Restauration partielle
             int pc = cpu.popWordS();
             cpu.getRegisters().setPC(pc);
             return 10;
@@ -2144,7 +1771,7 @@ public class InstructionDecoder {
     }
     
     private static int executeBRN_relative(CPU cpu) {
-        cpu.fetchByte(); // Lire l'offset mais ne pas brancher
+        cpu.fetchByte();
         return 2;
     }
     
@@ -2303,8 +1930,6 @@ public class InstructionDecoder {
         return 9;
     }
     
-    // ==================== TRANSFER/EXCHANGE ====================
-    
     private static int executeTFR(CPU cpu) {
         int postByte = cpu.fetchByte();
         int sourceReg = (postByte >> 4) & 0x0F;
@@ -2363,8 +1988,11 @@ public class InstructionDecoder {
         }
     }
     
-    // ==================== CwAI INSTRUCTIONS ====================
-
+    private static int executeSYNC(CPU cpu) {
+        cpu.sync();
+        return 2;
+    }
+    
     private static int executeCWAI_immediate(CPU cpu) {
         int mask = cpu.fetchByte();
         cpu.getFlags().setCC(cpu.getFlags().getCC() & mask);
@@ -2373,63 +2001,33 @@ public class InstructionDecoder {
     }
     
     private static int executeSWI(CPU cpu) {
-        cpu.pushWordS(cpu.getRegisters().getPC());
-        cpu.pushWordS(cpu.getRegisters().getU());
-        cpu.pushWordS(cpu.getRegisters().getY());
-        cpu.pushWordS(cpu.getRegisters().getX());
-        cpu.pushS(cpu.getRegisters().getDP());
-        cpu.pushS(cpu.getRegisters().getB());
-        cpu.pushS(cpu.getRegisters().getA());
-        cpu.pushS(cpu.getFlags().getCC());
+        // CORRECTION IMPORTANTE : SWI devrait arrêter l'exécution
+        // ou au moins ne pas continuer à exécuter du code aléatoire
         
-        cpu.getFlags().setEntire(true);
-        cpu.getFlags().setFIRQMask(true);
-        cpu.getFlags().setIRQMask(true);
+        System.out.println("SWI exécuté - Arrêt du programme");
         
-        int vector = cpu.getMemory().readWord(0xFFFA);
-        cpu.getRegisters().setPC(vector);
-        
+        // Option 1: Arrêter complètement
+        cpu.halt();
         return 19;
-    }
-    
-    private static int executeSWI2(CPU cpu) {
-        cpu.pushWordS(cpu.getRegisters().getPC());
-        cpu.pushWordS(cpu.getRegisters().getU());
-        cpu.pushWordS(cpu.getRegisters().getY());
-        cpu.pushWordS(cpu.getRegisters().getX());
-        cpu.pushS(cpu.getRegisters().getDP());
-        cpu.pushS(cpu.getRegisters().getB());
-        cpu.pushS(cpu.getRegisters().getA());
-        cpu.pushS(cpu.getFlags().getCC());
         
-        cpu.getFlags().setEntire(true);
-        cpu.getFlags().setFIRQMask(true);
-        cpu.getFlags().setIRQMask(true);
+        // Option 2: Continuer avec le vecteur d'interruption
+        // cpu.pushWordS(cpu.getRegisters().getPC());
+        // cpu.pushWordS(cpu.getRegisters().getU());
+        // cpu.pushWordS(cpu.getRegisters().getY());
+        // cpu.pushWordS(cpu.getRegisters().getX());
+        // cpu.pushS(cpu.getRegisters().getDP());
+        // cpu.pushS(cpu.getRegisters().getB());
+        // cpu.pushS(cpu.getRegisters().getA());
+        // cpu.pushS(cpu.getFlags().getCC());
         
-        int vector = cpu.getMemory().readWord(0xFFF4);
-        cpu.getRegisters().setPC(vector);
+        // cpu.getFlags().setEntire(true);
+        // cpu.getFlags().setFIRQMask(true);
+        // cpu.getFlags().setIRQMask(true);
         
-        return 20;
-    }
-    
-    private static int executeSWI3(CPU cpu) {
-        cpu.pushWordS(cpu.getRegisters().getPC());
-        cpu.pushWordS(cpu.getRegisters().getU());
-        cpu.pushWordS(cpu.getRegisters().getY());
-        cpu.pushWordS(cpu.getRegisters().getX());
-        cpu.pushS(cpu.getRegisters().getDP());
-        cpu.pushS(cpu.getRegisters().getB());
-        cpu.pushS(cpu.getRegisters().getA());
-        cpu.pushS(cpu.getFlags().getCC());
+        // int vector = cpu.getMemory().readWord(0xFFFA);
+        // cpu.getRegisters().setPC(vector);
         
-        cpu.getFlags().setEntire(true);
-        cpu.getFlags().setFIRQMask(true);
-        cpu.getFlags().setIRQMask(true);
-        
-        int vector = cpu.getMemory().readWord(0xFFF2);
-        cpu.getRegisters().setPC(vector);
-        
-        return 20;
+        // return 19;
     }
     
     private static int executeCLRA(CPU cpu) {
@@ -2485,8 +2083,6 @@ public class InstructionDecoder {
         return 2;
     }
     
-    // ==================== STACK INSTRUCTIONS ====================
-    
     private static int executePSHS(CPU cpu) {
         int postByte = cpu.fetchByte();
         Register reg = cpu.getRegisters();
@@ -2531,7 +2127,6 @@ public class InstructionDecoder {
         Register reg = cpu.getRegisters();
         int cycles = 5;
         
-        // Lire dans l'ordre inverse
         if ((postByte & 0x01) != 0) { // CC
             int cc = cpu.popS();
             cpu.getFlags().setCC(cc);
@@ -2650,8 +2245,6 @@ public class InstructionDecoder {
         return cycles;
     }
     
-    // ==================== LEA INSTRUCTIONS ====================
-    
     private static int executeLEAX(CPU cpu) {
         int address = decodeIndexedAddress(cpu);
         cpu.getRegisters().setX(address);
@@ -2678,134 +2271,111 @@ public class InstructionDecoder {
         return 4;
     }
     
-    // ==================== MÉTHODES D'AIDE ====================
-    
     private static int decodeIndexedAddress(CPU cpu) {
         int postByte = cpu.fetchByte();
         Register reg = cpu.getRegisters();
         
         int address = 0;
-        int offset;
         
         switch (postByte & 0x1F) {
             case 0x00: case 0x01: case 0x02: case 0x03: case 0x04: case 0x05: case 0x06: case 0x07:
-                // Constant offset from X
-                offset = postByte & 0x0F;
+                int offset = postByte & 0x0F;
                 if ((postByte & 0x10) != 0) offset = -offset;
                 address = reg.getX() + offset;
                 break;
                 
             case 0x08: case 0x09: case 0x0A: case 0x0B:
-                // Constant offset from Y
                 offset = postByte & 0x03;
                 if ((postByte & 0x04) != 0) offset = -offset;
                 address = reg.getY() + offset;
                 break;
                 
             case 0x0C: case 0x0D:
-                // Constant offset from U
                 offset = postByte & 0x01;
                 if ((postByte & 0x02) != 0) offset = -offset;
                 address = reg.getU() + offset;
                 break;
                 
             case 0x0E: case 0x0F:
-                // Constant offset from S
                 offset = postByte & 0x01;
                 if ((postByte & 0x02) != 0) offset = -offset;
                 address = reg.getS() + offset;
                 break;
                 
             case 0x10:
-                // Register X
                 address = reg.getX();
                 break;
                 
             case 0x11:
-                // Register Y
                 address = reg.getY();
                 break;
                 
             case 0x12:
-                // Register U
                 address = reg.getU();
                 break;
                 
             case 0x13:
-                // Register S
                 address = reg.getS();
                 break;
                 
             case 0x14:
-                // Post-increment by 1
                 address = reg.getX();
                 reg.setX(address + 1);
                 break;
                 
             case 0x15:
-                // Post-increment by 2
                 address = reg.getX();
                 reg.setX(address + 2);
                 break;
                 
             case 0x16:
-                // Pre-decrement by 1
                 reg.setX(reg.getX() - 1);
                 address = reg.getX();
                 break;
                 
             case 0x17:
-                // Pre-decrement by 2
                 reg.setX(reg.getX() - 2);
                 address = reg.getX();
                 break;
                 
             case 0x18:
-                // Zero offset
                 address = 0;
                 break;
                 
             case 0x19:
-                // Accumulator offset
                 offset = reg.getA();
                 if ((offset & 0x80) != 0) offset |= 0xFF00;
                 address = reg.getX() + offset;
                 break;
                 
             case 0x1A:
-                // Accumulator B offset
                 offset = reg.getB();
                 if ((offset & 0x80) != 0) offset |= 0xFF00;
                 address = reg.getX() + offset;
                 break;
                 
             case 0x1B:
-                // D (Accumulator) offset
                 offset = reg.getD();
                 address = reg.getX() + offset;
                 break;
                 
             case 0x1C:
-                // PC with 8-bit offset
                 offset = cpu.fetchByte();
                 if ((offset & 0x80) != 0) offset |= 0xFF00;
                 address = reg.getPC() + offset;
                 break;
                 
             case 0x1D:
-                // PC with 16-bit offset
                 offset = cpu.fetchWord();
                 address = reg.getPC() + offset;
                 break;
                 
             case 0x1E:
-                // Extended indirect
                 address = cpu.fetchWord();
                 address = cpu.getMemory().readWord(address);
                 break;
                 
             case 0x1F:
-                // Extended
                 address = cpu.fetchWord();
                 break;
         }
@@ -2814,7 +2384,8 @@ public class InstructionDecoder {
     }
     
     private static int handlePrefixedOpcode(CPU cpu, int opcode) {
-        // Les opcodes préfixés 0x10 et 0x11 sont déjà gérés dans le switch principal
+        System.err.println("Opcode préfixé non implémenté: 0x" + String.format("%04X", opcode));
+        cpu.halt();
         return 0;
     }
 }
