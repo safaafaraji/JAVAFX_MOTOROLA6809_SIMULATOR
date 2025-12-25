@@ -498,7 +498,7 @@ public class OpcodeGenerator {
         addOpcode("OPT", "DIRECTIVE", 0x0000);
     
      // TFR et EXG utilisent le même opcode avec un postbyte
-     // Le mode devrait être "INHERENT" mais nécessite un postbyte
+  
       
         addOpcode("PSHS", "IMMEDIATE", 0x34);
         addOpcode("PULS", "IMMEDIATE", 0x35);
@@ -506,7 +506,46 @@ public class OpcodeGenerator {
         addOpcode("PULU", "IMMEDIATE", 0x37);
         addOpcode("TFR", "IMMEDIATE", 0x1F);
         addOpcode("EXG", "IMMEDIATE", 0x1E);
+        addOpcode("ABA", "INHERENT", 0x1B);  // Add B to A
 
+        // Branchements conditionnels 8-bit
+        addOpcode("BRA", "RELATIVE", 0x20);
+        addOpcode("BRN", "RELATIVE", 0x21); // Branch Never
+        addOpcode("BHI", "RELATIVE", 0x22);
+        addOpcode("BLS", "RELATIVE", 0x23);
+        addOpcode("BCC", "RELATIVE", 0x24);
+        addOpcode("BCS", "RELATIVE", 0x25);
+        addOpcode("BNE", "RELATIVE", 0x26);
+        addOpcode("BEQ", "RELATIVE", 0x27);
+        addOpcode("BVC", "RELATIVE", 0x28);
+        addOpcode("BVS", "RELATIVE", 0x29);
+        addOpcode("BPL", "RELATIVE", 0x2A);
+        addOpcode("BMI", "RELATIVE", 0x2B);
+        addOpcode("BGE", "RELATIVE", 0x2C);
+        addOpcode("BLT", "RELATIVE", 0x2D);
+        addOpcode("BGT", "RELATIVE", 0x2E);
+        addOpcode("BLE", "RELATIVE", 0x2F);
+        
+        // Branchements longs 16-bit
+        addOpcode("LBRA", "RELATIVE", 0x16);
+        addOpcode("LBSR", "RELATIVE", 0x17);
+        addOpcode("LBNE", "RELATIVE", 0x1026);
+        addOpcode("LBEQ", "RELATIVE", 0x1027);
+        
+        // Instruction personnalisée
+        addOpcode("MAX", "INHERENT", 0xCD);
+        
+     // Dans OpcodeGenerator.java
+        addOpcode("ABA", "INHERENT", 0x1B);
+        
+        
+     // Dans initializeOpcodeTable():
+        addOpcode("ABA", "INHERENT", 0x1B); // Add B to A
+
+        // ADDA avec registre B = ABA
+        addOpcode("ADDA", "REGISTER", 0x1B); // ADDA B
+        addOpcode("ADDB", "REGISTER", 0x1B); // ADDB A
+        
      
     }
     
@@ -613,9 +652,9 @@ public class OpcodeGenerator {
             "ASLA", "ASLB", "ASRA", "ASRB", "LSRA", "LSRB",
             "ROLA", "ROLB", "RORA", "RORB",
             
-            // Branch
+           /* // Branch
             "BRA", "BCC", "BCS", "BEQ", "BNE", "BGE", "BLT",
-            "BGT", "BLE", "BHI", "BLS", "BVC", "BVS", "BPL", "BMI",
+            "BGT", "BLE", "BHI", "BLS", "BVC", "BVS", "BPL", "BMI",*/
             
             // Jump/Subroutine
             "JMP", "JSR", "BSR", "RTS", "RTI",

@@ -9,6 +9,14 @@ import javafx.geometry.*;
 import javafx.scene.paint.*;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+
+// NOUVEAUX IMPORTS AJOUTÉS :
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
+import javafx.application.Platform;
+import javafx.util.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -118,13 +126,9 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
             "; Tapez votre code assembleur ici\n" +
             "; ============================================\n\n" +
             "        ORG $1000           ; Adresse de départ\n\n" +
-            " START :										\n  "  +
-            "		 LDA #$05           ; Charger 5 dans A\n" +
-            "        LDB #$03           ; Charger 3 dans B\n" +
-            "        MUL                ; Multiplier A * B -> D\n" +
-            "        STA $2000          ; Stocker résultat\n" +
-            "        SWI                ; Retour au système\n\n" +
-            "        END                ; Fin du programme\n"
+            "START:  LDA #$55     ; Étiquette avec :\n" +
+            "        STA $2000\n" +
+            "        END\n"
         );
         
         HBox editorButtons = new HBox(10);
@@ -257,27 +261,39 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
     private void startRefreshTimer() {
         refreshExecutor = Executors.newSingleThreadScheduledExecutor();
         refreshExecutor.scheduleAtFixedRate(() -> {
-            javafx.application.Platform.runLater(() -> {
-                updateStatus();
-                updateLog();
-            });
-        }, 0, 100, TimeUnit.MILLISECONDS);
+            try {
+                Platform.runLater(() -> {
+                    try {
+                        updateStatus();
+                        updateLog();
+                    } catch (Exception e) {
+                        System.err.println("Erreur dans updateStatus/Log: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                System.err.println("Erreur dans le timer de rafraîchissement: " + e.getMessage());
+            }
+        }, 0, 500, TimeUnit.MILLISECONDS); // 500ms au lieu de 100ms pour réduire la charge
     }
     
     private void updateStatus() {
-        // Statut d'exécution
-        if (backend.isRunning()) {
-            statusLabel.setText(backend.isPaused() ? "⏸ Pause" : "▶ En cours");
-            statusLabel.setTextFill(backend.isPaused() ? Color.ORANGE : Color.GREEN);
-        } else {
-            statusLabel.setText("⏹ Arrêté");
-            statusLabel.setTextFill(Color.RED);
+        try {
+            // Statut d'exécution
+            if (backend.isRunning()) {
+                statusLabel.setText(backend.isPaused() ? "⏸ Pause" : "▶ En cours");
+                statusLabel.setTextFill(backend.isPaused() ? Color.ORANGE : Color.GREEN);
+            } else {
+                statusLabel.setText("⏹ Arrêté");
+                statusLabel.setTextFill(Color.RED);
+            }
+            
+            // Registres rapides
+            pcLabel.setText("PC: " + formatHex16(backend.getPC()));
+            aLabel.setText("A: " + formatHex8(backend.getA()));
+            bLabel.setText("B: " + formatHex8(backend.getB()));
+        } catch (Exception e) {
+            System.err.println("Erreur dans updateStatus: " + e.getMessage());
         }
-        
-        // Registres rapides
-        pcLabel.setText("PC: " + formatHex16(backend.getPC()));
-        aLabel.setText("A: " + formatHex8(backend.getA()));
-        bLabel.setText("B: " + formatHex8(backend.getB()));
     }
     
     private String formatHex16(int value) {
@@ -302,28 +318,108 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
     
     private void openMemoryViewer(int startAddress, String title) {
         Stage memStage = new Stage();
-        memStage.setTitle("Vue Mémoire - " + title);
+        memStage.setTitle("Vue Mémoire - " + title + " ($" + formatHex16(startAddress) + ")");
         
         VBox root = new VBox(10);
         root.setPadding(new Insets(15));
         
+        // Contrôles
+        HBox controls = new HBox(10);
+        controls.setAlignment(Pos.CENTER_LEFT);
+        
+        TextField addrField = new TextField("$" + formatHex16(startAddress));
+        addrField.setPrefWidth(100);
+        
+        Button refreshBtn = new Button("🔄 Rafraîchir");
+        
         // Table de mémoire
+        TableView<MemoryRow> table = createMemoryTable(startAddress);
+        table.setPrefHeight(400);
+        
+        // Remplir la table initialement
+        updateMemoryTableSafe(table, startAddress);
+        
+        // Configurer le bouton rafraîchir
+        refreshBtn.setOnAction(e -> {
+            try {
+                String text = addrField.getText().trim();
+                if (text.startsWith("$")) text = text.substring(1);
+                int newAddr = Integer.parseInt(text, 16);
+                updateMemoryTableSafe(table, newAddr);
+            } catch (NumberFormatException ex) {
+                showAlert("Erreur", "Adresse invalide: " + addrField.getText());
+            }
+        });
+        
+        Button writeBtn = new Button("✏️ Écrire");
+        writeBtn.setOnAction(e -> openMemoryEditor(startAddress));
+        
+        controls.getChildren().addAll(
+            new Label("Adresse:"), addrField, refreshBtn, writeBtn
+        );
+        
+        // Checkbox pour auto-rafraîchissement (SANS Timeline pour éviter StackOverflow)
+        CheckBox autoRefresh = new CheckBox("Auto-rafraîchir");
+        autoRefresh.setSelected(false); // Désactivé par défaut pour sécurité
+        
+        // Utiliser un ScheduledExecutorService au lieu de Timeline
+        ScheduledExecutorService memoryRefreshExecutor = Executors.newSingleThreadScheduledExecutor();
+        
+        autoRefresh.selectedProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal) {
+                // Activer le rafraîchissement automatique
+                memoryRefreshExecutor.scheduleAtFixedRate(() -> {
+                    Platform.runLater(() -> {
+                        try {
+                            String text = addrField.getText().trim();
+                            if (text.startsWith("$")) text = text.substring(1);
+                            int currentAddr = Integer.parseInt(text, 16);
+                            updateMemoryTableSafe(table, currentAddr);
+                        } catch (NumberFormatException ex) {
+                            // Ignorer les erreurs pendant le rafraîchissement automatique
+                        }
+                    });
+                }, 0, 2, TimeUnit.SECONDS); // Rafraîchir toutes les 2 secondes
+            } else {
+                // Désactiver le rafraîchissement
+                memoryRefreshExecutor.shutdown();
+            }
+        });
+        
+        // Arrêter l'executor quand la fenêtre se ferme
+        memStage.setOnCloseRequest(e -> {
+            memoryRefreshExecutor.shutdown();
+        });
+        
+        root.getChildren().addAll(controls, table, autoRefresh);
+        
+        Scene scene = new Scene(root, 600, 500);
+        memStage.setScene(scene);
+        memStage.show();
+    }
+    
+    private TableView<MemoryRow> createMemoryTable(int startAddress) {
         TableView<MemoryRow> table = new TableView<>();
         
         TableColumn<MemoryRow, String> addrCol = new TableColumn<>("Adresse");
+        addrCol.setPrefWidth(80);
         addrCol.setCellValueFactory(cell -> cell.getValue().addressProperty());
         
-        TableColumn<MemoryRow, String> dataCol = new TableColumn<>("Donnée");
-        dataCol.setCellValueFactory(cell -> cell.getValue().dataProperty());
+        TableColumn<MemoryRow, String> hexCol = new TableColumn<>("Hex");
+        hexCol.setPrefWidth(300);
+        hexCol.setCellValueFactory(cell -> cell.getValue().dataProperty());
         
         TableColumn<MemoryRow, String> asciiCol = new TableColumn<>("ASCII");
+        asciiCol.setPrefWidth(160);
         asciiCol.setCellValueFactory(cell -> cell.getValue().asciiProperty());
         
-        table.getColumns().addAll(addrCol, dataCol, asciiCol);
+        table.getColumns().addAll(addrCol, hexCol, asciiCol);
         
-        // Données
-        javafx.collections.ObservableList<MemoryRow> data = 
-            javafx.collections.FXCollections.observableArrayList();
+        return table;
+    }
+    
+    private void updateMemoryTable(TableView<MemoryRow> table, int startAddress) {
+        ObservableList<MemoryRow> data = FXCollections.observableArrayList();
         
         for (int i = 0; i < 256; i += 16) {
             StringBuilder hexLine = new StringBuilder();
@@ -349,22 +445,165 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
         }
         
         table.setItems(data);
-        table.setPrefHeight(400);
+    }
+    
+    private void updateMemoryTableSafe(TableView<MemoryRow> table, int startAddress) {
+        try {
+            ObservableList<MemoryRow> data = FXCollections.observableArrayList();
+            
+            for (int i = 0; i < 256; i += 16) {
+                StringBuilder hexLine = new StringBuilder();
+                StringBuilder asciiLine = new StringBuilder();
+                
+                for (int j = 0; j < 16; j++) {
+                    int addr = startAddress + i + j;
+                    byte value = backend.readMemory(addr);
+                    hexLine.append(String.format("%02X ", value));
+                    
+                    if (value >= 32 && value < 127) {
+                        asciiLine.append((char) value);
+                    } else {
+                        asciiLine.append(".");
+                    }
+                }
+                
+                data.add(new MemoryRow(
+                    String.format("%04X", startAddress + i),
+                    hexLine.toString().trim(),
+                    asciiLine.toString()
+                ));
+            }
+            
+            Platform.runLater(() -> {
+                table.setItems(data);
+            });
+        } catch (Exception e) {
+            System.err.println("Erreur lors du rafraîchissement de la table mémoire: " + e.getMessage());
+        }
+    }
+    
+    private void updateMemoryViewerTable(Stage stage, int newAddress) {
+        // Mettre à jour le titre
+        stage.setTitle("Vue Mémoire - $" + formatHex16(newAddress));
         
-        root.getChildren().add(table);
+        // Mettre à jour le contenu de la fenêtre
+        VBox root = (VBox) stage.getScene().getRoot();
         
-        Scene scene = new Scene(root, 600, 450);
-        memStage.setScene(scene);
-        memStage.show();
+        // Trouver la table dans les enfants
+        for (javafx.scene.Node node : root.getChildren()) {
+            if (node instanceof TableView) {
+                @SuppressWarnings("unchecked")
+                TableView<MemoryRow> table = (TableView<MemoryRow>) node;
+                updateMemoryTable(table, newAddress);
+                break;
+            }
+        }
+    }
+    
+    private void openMemoryEditor(int address) {
+        Stage editorStage = new Stage();
+        editorStage.setTitle("Éditeur de Mémoire - $" + formatHex16(address));
+        
+        VBox root = new VBox(10);
+        root.setPadding(new Insets(15));
+        
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(5);
+        
+        Label addrLabel = new Label("Adresse:");
+        TextField addrField = new TextField("$" + formatHex16(address));
+        addrField.setPrefWidth(100);
+        
+        Label valueLabel = new Label("Valeur:");
+        TextField valueField = new TextField();
+        valueField.setPrefWidth(100);
+        valueField.setPromptText("ex: $AA");
+        
+        // Lire la valeur actuelle
+        byte currentValue = backend.readMemory(address);
+        valueField.setText("$" + formatHex8(currentValue));
+        
+        grid.add(addrLabel, 0, 0);
+        grid.add(addrField, 1, 0);
+        grid.add(valueLabel, 0, 1);
+        grid.add(valueField, 1, 1);
+        
+        HBox buttons = new HBox(10);
+        
+        Button readBtn = new Button("Lire");
+        readBtn.setOnAction(e -> {
+            try {
+                String addrText = addrField.getText().trim();
+                if (addrText.startsWith("$")) addrText = addrText.substring(1);
+                int addr = Integer.parseInt(addrText, 16);
+                
+                byte value = backend.readMemory(addr);
+                valueField.setText("$" + formatHex8(value));
+                
+                // Mettre à jour l'affichage
+                showAlert("Lecture", 
+                    "Adresse $" + formatHex16(addr) + 
+                    " = $" + formatHex8(value));
+            } catch (NumberFormatException ex) {
+                showAlert("Erreur", "Adresse invalide: " + addrField.getText());
+            }
+        });
+        
+        Button writeBtn = new Button("Écrire");
+        writeBtn.setOnAction(e -> {
+            try {
+                String addrText = addrField.getText().trim();
+                String valueText = valueField.getText().trim();
+                
+                if (addrText.startsWith("$")) addrText = addrText.substring(1);
+                if (valueText.startsWith("$")) valueText = valueText.substring(1);
+                
+                int addr = Integer.parseInt(addrText, 16);
+                int value = Integer.parseInt(valueText, 16);
+                
+                backend.writeMemory(addr, (byte) value);
+                
+                showAlert("Écriture", 
+                    "Écrit $" + formatHex8(value) + 
+                    " à $" + formatHex16(addr));
+                
+                editorStage.close();
+            } catch (NumberFormatException ex) {
+                showAlert("Erreur", "Valeur invalide: " + valueField.getText());
+            }
+        });
+        
+        Button cancelBtn = new Button("Annuler");
+        cancelBtn.setOnAction(e -> editorStage.close());
+        
+        buttons.getChildren().addAll(readBtn, writeBtn, cancelBtn);
+        
+        root.getChildren().addAll(
+            new Label("Éditer la mémoire:"),
+            grid,
+            buttons
+        );
+        
+        Scene scene = new Scene(root, 300, 200);
+        editorStage.setScene(scene);
+        editorStage.show();
+    }
+    
+    private void showAlert(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
     }
     
     // ==================== IMPLÉMENTATION OBSERVER ====================
     
     @Override
     public void onRegisterUpdate(String register, int value) {
-        // Mettre à jour l'interface si nécessaire
         javafx.application.Platform.runLater(() -> {
-            updateStatus(); // Rafraîchir les labels
+            updateStatus();
         });
     }
     
@@ -394,10 +633,8 @@ public class MenuWindow extends Stage implements SimulatorBackend.SimulatorObser
     }
     
     @Override
-    public void onLogMessage(String message) {
-        javafx.application.Platform.runLater(() -> {
-            // Les logs sont déjà gérés par updateLog()
-        });
+    public void onExecutionStep(int pc, int opcode, int cycles) {
+        // Pas nécessaire pour MenuWindow
     }
     
     @Override

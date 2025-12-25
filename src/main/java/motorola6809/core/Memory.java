@@ -20,8 +20,8 @@ public class Memory {
      * Réinitialise la mémoire
      */
     public void reset() {
-        // Remplir de 0xFF (valeur non initialisée typique)
-        Arrays.fill(memory, (byte) 0xFF);
+        // Remplir de 0x00 (valeur initiale nulle)
+        Arrays.fill(memory, (byte) 0x00);
         
         // Initialiser les vecteurs d'interruption
         writeWord(Constants.VECTOR_RESET, 0x1400); // Reset vector vers ROM
@@ -48,14 +48,15 @@ public class Memory {
         address &= Constants.MASK_16BIT;
         value &= 0xFF;
         
-        // Vérifier si on écrit dans la ROM (écriture interdite)
-        if (memoryMap.isROM(address)) {
-            // La ROM est en lecture seule, on ignore l'écriture
-            // Mais pour le simulateur, on permet l'écriture
-            System.out.println("⚠️ Écriture en ROM à $" + String.format("%04X", address));
-        }
-        
+        // Dans le simulateur, on permet l'écriture partout
+        // même en ROM (pour faciliter le débogage)
         memory[address] = (byte) value;
+        
+        // Debug: afficher les écritures importantes
+        if (address >= 0x2000 && address <= 0x200F) {
+            System.out.println("MÉMOIRE: écrit $" + String.format("%02X", value) + 
+                             " à $" + String.format("%04X", address));
+        }
     }
     
     /**
@@ -107,13 +108,38 @@ public class Memory {
      */
     public String dumpMemory(int startAddress, int length) {
         StringBuilder sb = new StringBuilder();
+        sb.append("Dump mémoire $" + String.format("%04X", startAddress) + 
+                 " à $" + String.format("%04X", startAddress + length - 1) + ":\n");
+        
         for (int i = 0; i < length; i += 16) {
             sb.append(String.format("%04X: ", startAddress + i));
+            
+            // Hex
             for (int j = 0; j < 16 && (i + j) < length; j++) {
                 sb.append(String.format("%02X ", readByte(startAddress + i + j)));
             }
+            
+            sb.append(" ");
+            
+            // ASCII
+            for (int j = 0; j < 16 && (i + j) < length; j++) {
+                int val = readByte(startAddress + i + j);
+                if (val >= 32 && val < 127) {
+                    sb.append((char) val);
+                } else {
+                    sb.append(".");
+                }
+            }
+            
             sb.append("\n");
         }
         return sb.toString();
+    }
+    
+    /**
+     * Vérifie si une adresse contient une valeur spécifique
+     */
+    public boolean checkMemory(int address, int expectedValue) {
+        return (readByte(address) & 0xFF) == (expectedValue & 0xFF);
     }
 }

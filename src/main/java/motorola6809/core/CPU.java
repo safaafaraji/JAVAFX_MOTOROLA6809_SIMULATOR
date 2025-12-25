@@ -10,7 +10,11 @@ public class CPU {
     private Memory memory;
     private boolean running;
     private boolean halted;
+    private boolean waitingForInterrupt;  // ← Nom correct
+    private boolean sync;
     private long cycleCount;
+    private int instructionsExecuted;
+    private int maxInstructions; // Limite d'instructions
     
     public CPU() {
         this.registers = new Register();
@@ -18,7 +22,11 @@ public class CPU {
         this.memory = new Memory();
         this.running = false;
         this.halted = false;
+        this.waitingForInterrupt = false;  // ← Initialisé
+        this.sync = false;
         this.cycleCount = 0;
+        this.instructionsExecuted = 0;
+        this.maxInstructions = 1000; // Limite par défaut
     }
     
     public void reset() {
@@ -27,7 +35,10 @@ public class CPU {
         memory.reset();
         running = false;
         halted = false;
+        waitingForInterrupt = false;
+        sync = false;
         cycleCount = 0;
+        instructionsExecuted = 0;
         
         int resetVector = memory.readWord(Constants.VECTOR_RESET);
         if (resetVector != 0xFFFF) {
@@ -40,19 +51,42 @@ public class CPU {
     public void loadProgram(byte[] program, int startAddress) {
         memory.loadProgram(program, startAddress);
         registers.setPC(startAddress);
+        instructionsExecuted = 0;
     }
     
+    /**
+     * Exécute une seule instruction
+     */
     public int executeInstruction() {
         if (halted) {
             return 0;
         }
         
-        int opcode = fetch();
+        if (waitingForInterrupt || sync) {
+            return 1;
+        }
         
-        // ← UTILISE LE DÉCODEUR D'INSTRUCTIONS
+        // Protection contre les boucles infinies
+        if (instructionsExecuted >= maxInstructions) {
+            System.err.println("⚠️ Arrêt: limite de " + maxInstructions + " instructions atteinte");
+            halt();
+            return 0;
+        }
+        
+        // Protection PC hors limites
+        if (registers.getPC() > 0xFFFF) {
+            System.err.println("⚠️ Arrêt: PC hors limites (0x" + 
+                             String.format("%04X", registers.getPC()) + ")");
+            halt();
+            return 0;
+        }
+        
+        int opcode = fetch();
         int cycles = InstructionDecoder.decodeAndExecute(this, opcode);
         
         cycleCount += cycles;
+        instructionsExecuted++;
+        
         return cycles;
     }
     
@@ -72,6 +106,7 @@ public class CPU {
         return (high << 8) | low;
     }
     
+    // Méthodes de pile
     public void pushS(int value) {
         registers.setS(registers.getS() - 1);
         memory.writeByte(registers.getS(), value);
@@ -124,6 +159,8 @@ public class CPU {
     public void start() {
         this.running = true;
         this.halted = false;
+        this.waitingForInterrupt = false;
+        this.sync = false;
     }
     
     public void stop() {
@@ -141,6 +178,35 @@ public class CPU {
         while (running && !halted) {
             executeInstruction();
         }
+    }
+    
+    public void sync() {
+        this.sync = true;
+    }
+    
+    public void waitForInterrupt() {
+        this.waitingForInterrupt = true;
+    }
+    
+    // Permet de changer la limite d'instructions
+    public void setMaxInstructions(int max) {
+        this.maxInstructions = max;
+    }
+    
+    public int getInstructionsExecuted() {
+        return instructionsExecuted;
+    }
+    
+    public int getMaxInstructions() {
+        return maxInstructions;
+    }
+    
+    public boolean isWaitingForInterrupt() {
+        return waitingForInterrupt;
+    }
+    
+    public boolean isSync() {
+        return sync;
     }
     
     public Register getRegisters() {
@@ -170,12 +236,12 @@ public class CPU {
     @Override
     public String toString() {
         return String.format(
-            "CPU State:\n%s\n%s\nCycles: %d Running: %b Halted: %b",
+            "CPU State:\n%s\n%s\nCycles: %d Instructions: %d/%d",
             registers.toString(),
             flags.toString(),
             cycleCount,
-            running,
-            halted
+            instructionsExecuted,
+            maxInstructions
         );
     }
 }

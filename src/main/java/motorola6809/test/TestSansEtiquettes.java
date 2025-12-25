@@ -10,20 +10,19 @@ public class TestSansEtiquettes {
         Assembler assembler = new Assembler();
         
         // Programme SANS étiquettes - juste des adresses absolues
-        String simpleProgram = """
-            ; Programme sans étiquettes
-            ORG $1400
-            
-            ; Instructions avec adresses absolues
-            LDA #$01      ; Immédiat
-            LDB #$02      ; Immédiat
-            ADDA #$03     ; Immédiat
-            SUBB #$01     ; Immédiat
-            NOP           ; Inhérent
-            JMP $1400     ; Étendu (adresse absolue)
-            
-            END
-            """;
+        String simpleProgram = 
+        	    "; Programme sans étiquettes\n" +
+        	    "        ORG $1400\n" +
+        	    "\n" +
+        	    "        ; Instructions avec adresses absolues\n" +
+        	    "        LDA #$01            ; Immédiat\n" +
+        	    "        LDB #$02            ; Immédiat\n" +
+        	    "        ADDA #$03           ; Immédiat\n" +
+        	    "        SUBB #$01           ; Immédiat\n" +
+        	    "        NOP                 ; Inhérent\n" +
+        	    "        JMP $1400           ; Étendu (adresse absolue)\n" +
+        	    "\n" +
+        	    "        END\n";
         
         try {
             System.out.println("Assemblage...");
