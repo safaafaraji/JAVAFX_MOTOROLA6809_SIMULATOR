@@ -211,60 +211,93 @@ public class Assembler {
     private byte[] encodeOperand(String operand, String mode, String mnemonic, int lineNumber) {
         operand = operand.trim();
         
-        // Mode immédiat
-        if ("IMMEDIATE".equals(mode)) {
-            if (!operand.startsWith("#")) {
-                throw new AssemblerException("Mode immédiat nécessite #", lineNumber);
+        try {
+            // Mode INHERENT avec registre (ex: ADDA B)
+            if ("INHERENT".equals(mode) && isRegisterOperand(operand)) {
+                return encodeRegisterOperand(mnemonic, operand);
             }
-            String value = operand.substring(1);
-            int val = parseValue(value);
             
-            if (is16BitImmediate(mnemonic)) {
-                return new byte[] { 
-                    (byte) (val >> 8), 
-                    (byte) (val & 0xFF)
-                };
-            } else {
+            // Mode immédiat
+            if ("IMMEDIATE".equals(mode)) {
+                String value = operand.substring(1); // Retire #
+                int val = parseValue(value);
+                
+                if (is16BitImmediate(mnemonic)) {
+                    return new byte[] { 
+                        (byte) (val >> 8), 
+                        (byte) (val & 0xFF) 
+                    };
+                } else {
+                    return new byte[] { (byte) (val & 0xFF) };
+                }
+            }
+            
+            // Mode direct
+            if ("DIRECT".equals(mode)) {
+                int val = parseValue(operand);
                 return new byte[] { (byte) (val & 0xFF) };
             }
-        }
-        
-        // Mode direct
-        if ("DIRECT".equals(mode)) {
-            int val = parseValue(operand);
-            if (val < 0 || val > 0xFF) {
-                throw new AssemblerException("Valeur direct doit être 0-255", lineNumber);
+            
+            // Mode étendu
+            if ("EXTENDED".equals(mode)) {
+                int val = parseValue(operand);
+                return new byte[] { 
+                    (byte) (val >> 8), 
+                    (byte) (val & 0xFF) 
+                };
             }
-            return new byte[] { (byte) val };
-        }
-        
-        // Mode étendu
-        if ("EXTENDED".equals(mode)) {
-            int val = parseValue(operand);
-            if (val < 0 || val > 0xFFFF) {
-                throw new AssemblerException("Adresse étendue doit être 0-65535", lineNumber);
+            
+            // Mode indexé (simplifié)
+            if ("INDEXED".equals(mode)) {
+                // Pour ,X simple
+                if (operand.contains(",X") && !operand.contains("[")) {
+                    return new byte[] { (byte) 0x84 }; // Postbyte pour ,X
+                }
             }
-            return new byte[] { 
-                (byte) ((val >> 8) & 0xFF), 
-                (byte) (val & 0xFF)
-            };
-        }
-        
-        // Mode inhérent - pas d'opérande
-        if ("INHERENT".equals(mode)) {
+            
             return new byte[0];
+            
+        } catch (Exception e) {
+            throw new AssemblerException(
+                "Erreur avec " + mnemonic + ": " + e.getMessage(),
+                lineNumber
+            );
         }
+    }
+
+    
+    /**
+     * Vérifie si l'opérande est un registre
+     */
+    private boolean isRegisterOperand(String operand) {
+        if (operand == null) return false;
         
-        // Mode indexé (simplifié)
-        if ("INDEXED".equals(mode)) {
-            // Pour l'instant, simplifions avec ,X seulement
-            if (operand.equals(",X")) {
-                return new byte[] { (byte) 0x84 };
+        String[] registers = {"A", "B", "D", "X", "Y", "U", "S", "PC", "DP", "CC"};
+        
+        for (String reg : registers) {
+            if (reg.equalsIgnoreCase(operand)) {
+                return true;
             }
-            throw new AssemblerException("Mode indexé non supporté: " + operand, lineNumber);
+        }
+        return false;
+    }
+
+    /**
+     * Encode un opérande registre pour les instructions comme ADDA B
+     */
+    private byte[] encodeRegisterOperand(String mnemonic, String register) {
+        // Pour ADDA B, c'est en réalité l'instruction ABA
+        if ("ADDA".equalsIgnoreCase(mnemonic) && "B".equalsIgnoreCase(register)) {
+            return new byte[0]; // Aucun opérande, c'est ABA (0x1B)
         }
         
-        throw new AssemblerException("Mode d'adressage non supporté: " + mode, lineNumber);
+        // Pour ADDB A, c'est aussi ABA
+        if ("ADDB".equalsIgnoreCase(mnemonic) && "A".equalsIgnoreCase(register)) {
+            return new byte[0]; // Aucun opérande, c'est ABA (0x1B)
+        }
+        
+        // Pour d'autres combinaisons...
+        return new byte[0];
     }
     
     private int parseValue(String value) {

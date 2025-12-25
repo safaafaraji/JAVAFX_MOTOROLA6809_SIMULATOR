@@ -535,6 +535,17 @@ public class OpcodeGenerator {
         // Instruction personnalisée
         addOpcode("MAX", "INHERENT", 0xCD);
         
+     // Dans OpcodeGenerator.java
+        addOpcode("ABA", "INHERENT", 0x1B);
+        
+        
+     // Dans initializeOpcodeTable():
+        addOpcode("ABA", "INHERENT", 0x1B); // Add B to A
+
+        // ADDA avec registre B = ABA
+        addOpcode("ADDA", "REGISTER", 0x1B); // ADDA B
+        addOpcode("ADDB", "REGISTER", 0x1B); // ADDB A
+        
      
     }
     

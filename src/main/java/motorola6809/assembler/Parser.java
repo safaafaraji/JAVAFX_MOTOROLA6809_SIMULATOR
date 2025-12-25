@@ -214,6 +214,25 @@ public class Parser {
     }
     
     /**
+     * Vérifie si c'est un nom de registre
+     */
+    public static boolean isRegister(String word) {
+        if (word == null || word.isEmpty()) {
+            return false;
+        }
+        
+        String[] registers = {
+            "A", "B", "D", "X", "Y", "U", "S", "PC", "DP", "CC"
+        };
+        
+        for (String reg : registers) {
+            if (reg.equalsIgnoreCase(word)) {
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
      * Détermine le mode d'adressage
      */
     public static String getAddressingMode(String mnemonic, String operand) {
@@ -223,7 +242,13 @@ public class Parser {
         
         operand = operand.trim();
         
-        // Instructions spéciales
+        // === NOUVEAU : Instructions avec registre comme opérande ===
+        // ADDA B, ADDB A, SUBA B, SUBB A, etc.
+        if (isRegisterOperand(operand)) {
+            return "INHERENT"; // Ces instructions sont inherent
+        }
+        
+        // Instructions spéciales avec postbyte
         String[] immediateWithRegs = {"PSHS", "PSHU", "PULS", "PULU", "TFR", "EXG"};
         for (String instr : immediateWithRegs) {
             if (instr.equals(mnemonic)) {
@@ -266,8 +291,27 @@ public class Parser {
             // Pas un nombre
         }
         
-        // Étiquette = mode étendu
+        // Sinon, c'est probablement une étiquette = mode étendu
         return "EXTENDED";
+    }
+
+    /**
+     * Vérifie si l'opérande est un registre
+     */
+    private static boolean isRegisterOperand(String operand) {
+        if (operand == null) return false;
+        
+        String[] registers = {
+            "A", "B", "D", "X", "Y", "U", "S", "PC", "DP", "CC"
+        };
+        
+        for (String reg : registers) {
+            if (reg.equalsIgnoreCase(operand)) {
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     /**

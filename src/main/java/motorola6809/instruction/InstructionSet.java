@@ -212,6 +212,8 @@ public class InstructionSet {
         register(new BSR());    // Branch to Subroutine (0x8D)
         register(new LBRA());   // Long Branch Always (0x16)
         register(new LBSR());   // Long Branch to Subroutine (0x17)
+        
+        register(new ABA());
     }
 
     
